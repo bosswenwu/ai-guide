@@ -127,3 +127,6 @@ dist
 
 temp.ts
 AGENTS.md
+
+# Generated script output
+scripts/output/
