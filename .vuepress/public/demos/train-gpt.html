@@ -1,0 +1,857 @@
+<title>在浏览器里从零训练一个 GPT</title>
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --accent-soft: #86b6ef;
+    --heat-lo: #f0f4fa;
+    --good: #006300;
+    --btn-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+      --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+      --border: rgba(255,255,255,0.10);
+      --accent: #3987e5; --accent-soft: #184f95;
+      --heat-lo: #20242b; --good: #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+    --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --accent: #3987e5; --accent-soft: #184f95;
+    --heat-lo: #20242b; --good: #0ca30c;
+  }
+  :root[data-theme="light"] {
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+    --muted: #898781; --grid: #e1e0d9; --axis: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6; --accent-soft: #86b6ef;
+    --heat-lo: #f0f4fa; --good: #006300;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.5; padding: 28px 20px 60px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+
+  .eyebrow { font-size: 11px; letter-spacing: 0.22em; color: var(--accent); font-weight: 600; }
+  h1 { font-size: clamp(24px, 4vw, 34px); font-weight: 700; margin-top: 8px; text-wrap: balance; }
+  .sub { color: var(--ink-2); margin-top: 8px; max-width: 46em; font-size: 14px; }
+  .archline { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .archline span {
+    font-size: 11px; color: var(--ink-2); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .archline b { color: var(--ink); font-weight: 600; }
+
+  .controls {
+    margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  }
+  button, select {
+    font: inherit; font-size: 13px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--page); color: var(--ink); padding: 8px 14px;
+  }
+  button.primary { background: var(--accent); color: var(--btn-ink); border-color: transparent; font-weight: 600; min-width: 110px; }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .ctl { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
+  input[type="range"] { accent-color: var(--accent); width: 110px; }
+  .spacer { flex: 1; }
+
+  .tiles { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .tile .k { font-size: 11px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+  .tile .v { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .tile .v small { font-size: 12px; font-weight: 500; color: var(--ink-2); margin-left: 3px; }
+  .tile .d { font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+  .grid2 { margin-top: 14px; display: grid; grid-template-columns: 1.35fr 1fr; gap: 12px; }
+  @media (max-width: 880px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; position: relative; }
+  .card h2 { font-size: 14px; font-weight: 600; }
+  .card .note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .legend { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--ink-2); }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  canvas.chart { width: 100%; margin-top: 8px; display: block; cursor: crosshair; }
+
+  .tooltip {
+    position: fixed; pointer-events: none; z-index: 10;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    opacity: 0; transition: opacity 120ms; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .tooltip .row { display: flex; align-items: center; gap: 6px; }
+  .tooltip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chips button { padding: 5px 11px; font-size: 12px; border-radius: 999px; }
+  .chips button.on { background: var(--accent); color: var(--btn-ink); border-color: transparent; }
+
+  .gen { margin-top: 12px; }
+  .gen .item {
+    border-left: 3px solid var(--accent); background: var(--page);
+    border-radius: 0 8px 8px 0; padding: 10px 14px; margin-top: 10px;
+  }
+  .gen .step { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .gen .txt { margin-top: 4px; font-size: 15px; line-height: 1.9; word-break: break-all; }
+  .gen .txt .prompt { color: var(--accent); font-weight: 600; }
+
+  .explain { margin-top: 14px; }
+  .explain ol { margin: 10px 0 0 20px; font-size: 13px; color: var(--ink-2); }
+  .explain li { margin-top: 8px; }
+  .explain b { color: var(--ink); }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">AI GUIDE · 互动实验</div>
+  <h1>在浏览器里，从零训练一个 GPT</h1>
+  <p class="sub">下面是一个真实的 Transformer 语言模型——不是演示动画。前向传播、反向传播、Adam 优化器全部用纯 JavaScript 手写（零依赖），梯度已通过数值校验。点「开始训练」，看它从随机噪声学会写五言绝句。</p>
+  <div class="archline">
+    <span>参数量 <b id="nparams">—</b></span><span><b>2</b> 层 Transformer</span>
+    <span><b>4</b> 头自注意力</span><span>d_model <b>48</b></span>
+    <span>上下文 <b>24</b> tokens</span><span>字符级分词</span><span>手写 backprop</span>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="runBtn">▶ 开始训练</button>
+    <button id="resetBtn">重置</button>
+    <div class="ctl">语料
+      <select id="corpusSel">
+        <option value="tang">唐诗 · 五言绝句</option>
+        <option value="alice">English · Alice</option>
+      </select>
+    </div>
+    <div class="ctl">学习率
+      <select id="lrSel">
+        <option value="0.001">0.001</option>
+        <option value="0.003" selected>0.003</option>
+        <option value="0.01">0.01</option>
+      </select>
+    </div>
+    <div class="ctl">速度
+      <select id="speedSel">
+        <option value="1">1 步/帧</option>
+        <option value="3" selected>3 步/帧</option>
+        <option value="6">6 步/帧</option>
+      </select>
+    </div>
+    <div class="spacer"></div>
+    <div class="ctl">采样温度 <input type="range" id="tempRange" min="0.1" max="1.5" step="0.05" value="0.8"><span id="tempVal">0.80</span></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">Step</div><div class="v" id="stepV">0</div><div class="d" id="epochV">epoch 0</div></div>
+    <div class="tile"><div class="k">Loss</div><div class="v" id="lossV">—</div><div class="d" id="lossD">随机基线 —</div></div>
+    <div class="tile"><div class="k">吞吐</div><div class="v" id="tpsV">0<small>tok/s</small></div><div class="d" id="msV">— ms/step</div></div>
+    <div class="tile"><div class="k">训练时长</div><div class="v" id="timeV">0<small>s</small></div><div class="d" id="tokensV">0 tokens</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>训练损失</h2>
+      <div class="note">交叉熵，nats。虚线为随机猜测基线 ln(词表大小)。</div>
+      <div class="legend">
+        <span><i id="legRaw"></i>loss（每步）</span>
+        <span><i id="legEma"></i>EMA 平滑</span>
+      </div>
+      <canvas class="chart" id="lossChart" height="300"></canvas>
+    </div>
+    <div class="card">
+      <h2>自注意力热图</h2>
+      <div class="note" id="attNote">探针句 · 行 = query，列 = key（因果遮罩：只能看左边）</div>
+      <div class="chips" id="headChips"></div>
+      <canvas class="chart" id="attChart" height="330"></canvas>
+    </div>
+  </div>
+
+  <div class="card gen" style="margin-top:12px">
+    <h2>模型生成样本 <button id="genBtn" style="margin-left:10px; font-size:12px">✍ 立即生成</button></h2>
+    <div class="note">每 60 步自动采样一次。蓝色为给定的开头，其余是模型逐字生成的。</div>
+    <div id="genList"></div>
+  </div>
+
+  <div class="card explain">
+    <h2>你正在看什么</h2>
+    <ol>
+      <li><b>Loss 从 ~5.8 一路下降</b>：开始时模型对下一个字的预测和瞎猜没区别（loss = ln 词表大小）。每一步它在 192 个字符上做预测、算误差、把误差沿着 9 万个参数反向传播、再用 Adam 更新——你看到的曲线就是它「学会」的过程。</li>
+      <li><b>注意力热图从均匀变得有结构</b>：训练前每个字均匀地看所有前文；训练后你会看到对角线条纹和竖直亮列——模型发现了「五言 + 标点」的周期结构，学会该回头看哪个字。</li>
+      <li><b>生成样本从乱码到像诗</b>：几百步后它先学会「五个字一个逗号」的格律，再慢慢背下词句。这就是大模型训练的完整过程——只是 GPT-4 的参数量是它的一千万倍。</li>
+    </ol>
+  </div>
+</div>
+
+<div class="tooltip" id="tip"></div>
+
+<script>
+// ================= minimal GPT core (gradcheck-verified) =================
+function createGPT(cfg) {
+  const { V, D, H, L, T } = cfg;
+  const B = cfg.B || 8;
+  const HD = D / H, F = 4 * D, NMAX = B * T;
+  let seed = cfg.seed || 1337;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  const randn = () => { const u = Math.max(rand(), 1e-9), v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const P = {}, G = {}, M = {}, Vm = {};
+  function param(name, size, std) {
+    const a = new Float64Array(size);
+    if (std > 0) for (let i = 0; i < size; i++) a[i] = randn() * std;
+    P[name] = a; G[name] = new Float64Array(size);
+    M[name] = new Float64Array(size); Vm[name] = new Float64Array(size);
+    return a;
+  }
+  param('wte', V * D, 0.06); param('wpe', T * D, 0.01);
+  for (let l = 0; l < L; l++) {
+    param(`g1_${l}`, D, 0).fill(1); param(`b1_${l}`, D, 0);
+    param(`wqkv_${l}`, D * 3 * D, 0.06); param(`bqkv_${l}`, 3 * D, 0);
+    param(`wpr_${l}`, D * D, 0.06 / Math.sqrt(2 * L)); param(`bpr_${l}`, D, 0);
+    param(`g2_${l}`, D, 0).fill(1); param(`b2_${l}`, D, 0);
+    param(`wfc_${l}`, D * F, 0.06); param(`bfc_${l}`, F, 0);
+    param(`wf2_${l}`, F * D, 0.06 / Math.sqrt(2 * L)); param(`bf2_${l}`, D, 0);
+  }
+  param('gf', D, 0).fill(1); param('bf', D, 0);
+  param('whead', D * V, 0.06);
+  const nParams = Object.values(P).reduce((s, a) => s + a.length, 0);
+  const buf = n => new Float64Array(n);
+  const A = { x: [], ln1: [], ln1m: [], ln1r: [], qkv: [], att: [], ao: [], proj: [], xa: [], ln2: [], ln2m: [], ln2r: [], fcpre: [], fc: [], fc2: [] };
+  for (let l = 0; l < L; l++) {
+    A.x.push(buf(NMAX * D));
+    A.ln1.push(buf(NMAX * D)); A.ln1m.push(buf(NMAX)); A.ln1r.push(buf(NMAX));
+    A.qkv.push(buf(NMAX * 3 * D)); A.att.push(buf(B * H * T * T));
+    A.ao.push(buf(NMAX * D)); A.proj.push(buf(NMAX * D)); A.xa.push(buf(NMAX * D));
+    A.ln2.push(buf(NMAX * D)); A.ln2m.push(buf(NMAX)); A.ln2r.push(buf(NMAX));
+    A.fcpre.push(buf(NMAX * F)); A.fc.push(buf(NMAX * F)); A.fc2.push(buf(NMAX * D));
+  }
+  A.xf = buf(NMAX * D); A.lnf = buf(NMAX * D); A.lnfm = buf(NMAX); A.lnfr = buf(NMAX);
+  A.logits = buf(NMAX * V); A.probs = buf(NMAX * V);
+  const dbuf = { x: buf(NMAX * D), y: buf(NMAX * D), qkv: buf(NMAX * 3 * D), ao: buf(NMAX * D), fc: buf(NMAX * F), fcpre: buf(NMAX * F), tmp: buf(NMAX * D) };
+
+  function matmul(out, x, w, b, N, K, Mo) {
+    for (let n = 0; n < N; n++) {
+      const xo = n * K, oo = n * Mo;
+      for (let m = 0; m < Mo; m++) out[oo + m] = b ? b[m] : 0;
+      for (let k = 0; k < K; k++) {
+        const xv = x[xo + k];
+        if (xv === 0) continue;
+        const wo = k * Mo;
+        for (let m = 0; m < Mo; m++) out[oo + m] += xv * w[wo + m];
+      }
+    }
+  }
+  function matmulBwd(dx, dw, db, dout, x, w, N, K, Mo) {
+    for (let n = 0; n < N; n++) {
+      const xo = n * K, oo = n * Mo;
+      for (let k = 0; k < K; k++) {
+        const wo = k * Mo;
+        let s = 0;
+        const xv = x[xo + k];
+        for (let m = 0; m < Mo; m++) {
+          const d = dout[oo + m];
+          s += d * w[wo + m];
+          dw[wo + m] += xv * d;
+        }
+        dx[xo + k] = s;
+      }
+      if (db) for (let m = 0; m < Mo; m++) db[m] += dout[oo + m];
+    }
+  }
+  function layernorm(out, mean, rstd, x, g, b, N) {
+    for (let n = 0; n < N; n++) {
+      const o = n * D;
+      let mu = 0;
+      for (let i = 0; i < D; i++) mu += x[o + i];
+      mu /= D;
+      let vv = 0;
+      for (let i = 0; i < D; i++) { const d = x[o + i] - mu; vv += d * d; }
+      const rs = 1 / Math.sqrt(vv / D + 1e-5);
+      mean[n] = mu; rstd[n] = rs;
+      for (let i = 0; i < D; i++) out[o + i] = (x[o + i] - mu) * rs * g[i] + b[i];
+    }
+  }
+  function layernormBwd(dx, dg, db, dout, x, g, mean, rstd, N) {
+    for (let n = 0; n < N; n++) {
+      const o = n * D, mu = mean[n], rs = rstd[n];
+      let s1 = 0, s2 = 0;
+      for (let i = 0; i < D; i++) {
+        const xh = (x[o + i] - mu) * rs;
+        const dyg = dout[o + i] * g[i];
+        s1 += dyg; s2 += dyg * xh;
+        dg[i] += dout[o + i] * xh; db[i] += dout[o + i];
+      }
+      s1 /= D; s2 /= D;
+      for (let i = 0; i < D; i++) {
+        const xh = (x[o + i] - mu) * rs;
+        dx[o + i] = rs * (dout[o + i] * g[i] - s1 - xh * s2);
+      }
+    }
+  }
+  const GK = Math.sqrt(2 / Math.PI);
+  const gelu = x => 0.5 * x * (1 + Math.tanh(GK * (x + 0.044715 * x * x * x)));
+  const geluD = x => {
+    const t = Math.tanh(GK * (x + 0.044715 * x * x * x));
+    return 0.5 * (1 + t) + 0.5 * x * (1 - t * t) * GK * (1 + 3 * 0.044715 * x * x);
+  };
+  function attention(l, Bc, Tc, capture) {
+    const qkv = A.qkv[l], att = A.att[l], ao = A.ao[l];
+    const scale = 1 / Math.sqrt(HD);
+    ao.fill(0, 0, Bc * Tc * D);
+    for (let b = 0; b < Bc; b++) for (let h = 0; h < H; h++) {
+      const ho = h * HD;
+      for (let t = 0; t < Tc; t++) {
+        const qo = (b * Tc + t) * 3 * D + ho;
+        const ab = ((b * H + h) * T + t) * T;
+        let mx = -1e30;
+        for (let t2 = 0; t2 <= t; t2++) {
+          const ko = (b * Tc + t2) * 3 * D + D + ho;
+          let s = 0;
+          for (let i = 0; i < HD; i++) s += qkv[qo + i] * qkv[ko + i];
+          s *= scale; att[ab + t2] = s;
+          if (s > mx) mx = s;
+        }
+        let sum = 0;
+        for (let t2 = 0; t2 <= t; t2++) { const e = Math.exp(att[ab + t2] - mx); att[ab + t2] = e; sum += e; }
+        const inv = 1 / sum;
+        for (let t2 = 0; t2 <= t; t2++) att[ab + t2] *= inv;
+        for (let t2 = t + 1; t2 < Tc; t2++) att[ab + t2] = 0;
+        const oo = (b * Tc + t) * D + ho;
+        for (let t2 = 0; t2 <= t; t2++) {
+          const vo = (b * Tc + t2) * 3 * D + 2 * D + ho;
+          const a = att[ab + t2];
+          for (let i = 0; i < HD; i++) ao[oo + i] += a * qkv[vo + i];
+        }
+      }
+    }
+    if (capture) {
+      const snap = [];
+      for (let h = 0; h < H; h++) {
+        const m = new Float64Array(Tc * Tc);
+        for (let t = 0; t < Tc; t++) for (let t2 = 0; t2 < Tc; t2++)
+          m[t * Tc + t2] = att[((0 * H + h) * T + t) * T + t2];
+        snap.push(m);
+      }
+      capture.push(snap);
+    }
+  }
+  function attentionBwd(l, dao, dqkv, Bc, Tc) {
+    const qkv = A.qkv[l], att = A.att[l];
+    const scale = 1 / Math.sqrt(HD);
+    dqkv.fill(0, 0, Bc * Tc * 3 * D);
+    const datt = new Float64Array(T);
+    for (let b = 0; b < Bc; b++) for (let h = 0; h < H; h++) {
+      const ho = h * HD;
+      for (let t = 0; t < Tc; t++) {
+        const ab = ((b * H + h) * T + t) * T;
+        const oo = (b * Tc + t) * D + ho;
+        let dot = 0;
+        for (let t2 = 0; t2 <= t; t2++) {
+          const vo = (b * Tc + t2) * 3 * D + 2 * D + ho;
+          let da = 0;
+          const a = att[ab + t2];
+          for (let i = 0; i < HD; i++) {
+            const d = dao[oo + i];
+            da += d * qkv[vo + i];
+            dqkv[vo + i] += a * d;
+          }
+          datt[t2] = da; dot += a * da;
+        }
+        const qo = (b * Tc + t) * 3 * D + ho;
+        for (let t2 = 0; t2 <= t; t2++) {
+          const ds = att[ab + t2] * (datt[t2] - dot) * scale;
+          const ko = (b * Tc + t2) * 3 * D + D + ho;
+          for (let i = 0; i < HD; i++) {
+            dqkv[qo + i] += ds * qkv[ko + i];
+            dqkv[ko + i] += ds * qkv[qo + i];
+          }
+        }
+      }
+    }
+  }
+  function forward(tokens, Bc, Tc, capture) {
+    const N = Bc * Tc;
+    const x0 = A.x[0];
+    for (let n = 0; n < N; n++) {
+      const tok = tokens[n], pos = n % Tc;
+      const o = n * D, eo = tok * D, po = pos * D;
+      for (let i = 0; i < D; i++) x0[o + i] = P.wte[eo + i] + P.wpe[po + i];
+    }
+    for (let l = 0; l < L; l++) {
+      const xin = A.x[l];
+      layernorm(A.ln1[l], A.ln1m[l], A.ln1r[l], xin, P[`g1_${l}`], P[`b1_${l}`], N);
+      matmul(A.qkv[l], A.ln1[l], P[`wqkv_${l}`], P[`bqkv_${l}`], N, D, 3 * D);
+      attention(l, Bc, Tc, capture);
+      matmul(A.proj[l], A.ao[l], P[`wpr_${l}`], P[`bpr_${l}`], N, D, D);
+      const xa = A.xa[l];
+      for (let i = 0; i < N * D; i++) xa[i] = xin[i] + A.proj[l][i];
+      layernorm(A.ln2[l], A.ln2m[l], A.ln2r[l], xa, P[`g2_${l}`], P[`b2_${l}`], N);
+      matmul(A.fcpre[l], A.ln2[l], P[`wfc_${l}`], P[`bfc_${l}`], N, D, F);
+      const fc = A.fc[l], fcpre = A.fcpre[l];
+      for (let i = 0; i < N * F; i++) fc[i] = gelu(fcpre[i]);
+      matmul(A.fc2[l], fc, P[`wf2_${l}`], P[`bf2_${l}`], N, F, D);
+      const xout = l + 1 < L ? A.x[l + 1] : A.xf;
+      for (let i = 0; i < N * D; i++) xout[i] = xa[i] + A.fc2[l][i];
+    }
+    layernorm(A.lnf, A.lnfm, A.lnfr, A.xf, P.gf, P.bf, N);
+    matmul(A.logits, A.lnf, P.whead, null, N, D, V);
+    return A.logits;
+  }
+  function loss(targets, N) {
+    let total = 0;
+    const probs = A.probs, logits = A.logits;
+    for (let n = 0; n < N; n++) {
+      const o = n * V;
+      let mx = -1e30;
+      for (let v = 0; v < V; v++) if (logits[o + v] > mx) mx = logits[o + v];
+      let sum = 0;
+      for (let v = 0; v < V; v++) { const e = Math.exp(logits[o + v] - mx); probs[o + v] = e; sum += e; }
+      const inv = 1 / sum;
+      for (let v = 0; v < V; v++) probs[o + v] *= inv;
+      total += -Math.log(Math.max(probs[o + targets[n]], 1e-12));
+    }
+    return total / N;
+  }
+  function zeroGrads() { for (const k in G) G[k].fill(0); }
+  function backward(tokens, targets, Bc, Tc) {
+    const N = Bc * Tc;
+    const dlogits = A.probs;
+    for (let n = 0; n < N; n++) {
+      const o = n * V;
+      dlogits[o + targets[n]] -= 1;
+      for (let v = 0; v < V; v++) dlogits[o + v] /= N;
+    }
+    const dlnf = dbuf.x;
+    matmulBwd(dlnf, G.whead, null, dlogits, A.lnf, P.whead, N, D, V);
+    const dxf = dbuf.y;
+    layernormBwd(dxf, G.gf, G.bf, dlnf, A.xf, P.gf, A.lnfm, A.lnfr, N);
+    let dx = dxf;
+    for (let l = L - 1; l >= 0; l--) {
+      const dfc = dbuf.fc;
+      matmulBwd(dfc, G[`wf2_${l}`], G[`bf2_${l}`], dx, A.fc[l], P[`wf2_${l}`], N, F, D);
+      const dfcpre = dbuf.fcpre, fcpre = A.fcpre[l];
+      for (let i = 0; i < N * F; i++) dfcpre[i] = dfc[i] * geluD(fcpre[i]);
+      const dln2 = dbuf.tmp;
+      matmulBwd(dln2, G[`wfc_${l}`], G[`bfc_${l}`], dfcpre, A.ln2[l], P[`wfc_${l}`], N, D, F);
+      const dxa = dbuf.x === dx ? dbuf.y : dbuf.x;
+      layernormBwd(dxa, G[`g2_${l}`], G[`b2_${l}`], dln2, A.xa[l], P[`g2_${l}`], A.ln2m[l], A.ln2r[l], N);
+      for (let i = 0; i < N * D; i++) dxa[i] += dx[i];
+      const dao = dbuf.ao;
+      matmulBwd(dao, G[`wpr_${l}`], G[`bpr_${l}`], dxa, A.ao[l], P[`wpr_${l}`], N, D, D);
+      attentionBwd(l, dao, dbuf.qkv, Bc, Tc);
+      const dln1 = dbuf.tmp;
+      matmulBwd(dln1, G[`wqkv_${l}`], G[`bqkv_${l}`], dbuf.qkv, A.ln1[l], P[`wqkv_${l}`], N, D, 3 * D);
+      const dxin = dxa === dbuf.x ? dbuf.y : dbuf.x;
+      layernormBwd(dxin, G[`g1_${l}`], G[`b1_${l}`], dln1, A.x[l], P[`g1_${l}`], A.ln1m[l], A.ln1r[l], N);
+      for (let i = 0; i < N * D; i++) dxin[i] += dxa[i];
+      dx = dxin;
+    }
+    for (let n = 0; n < N; n++) {
+      const tok = tokens[n], pos = n % Tc;
+      const o = n * D, eo = tok * D, po = pos * D;
+      for (let i = 0; i < D; i++) { G.wte[eo + i] += dx[o + i]; G.wpe[po + i] += dx[o + i]; }
+    }
+  }
+  function step(tokens, targets) {
+    zeroGrads();
+    forward(tokens, B, T, null);
+    const l = loss(targets, B * T);
+    backward(tokens, targets, B, T);
+    return l;
+  }
+  let adamT = 0;
+  function adam(lr) {
+    adamT++;
+    const b1 = 0.9, b2 = 0.99, eps = 1e-8;
+    const c1 = 1 - Math.pow(b1, adamT), c2 = 1 - Math.pow(b2, adamT);
+    for (const k in P) {
+      const p = P[k], g = G[k], m = M[k], v = Vm[k];
+      for (let i = 0; i < p.length; i++) {
+        const gi = g[i];
+        m[i] = b1 * m[i] + (1 - b1) * gi;
+        v[i] = b2 * v[i] + (1 - b2) * gi * gi;
+        p[i] -= lr * (m[i] / c1) / (Math.sqrt(v[i] / c2) + eps);
+      }
+    }
+  }
+  function evalLogitsLast(seq, capture) {
+    const Tc = Math.min(seq.length, T);
+    const toks = seq.slice(seq.length - Tc);
+    forward(toks, 1, Tc, capture);
+    return { logits: A.logits, offset: (Tc - 1) * V, Tc, toks };
+  }
+  function generate(prompt, n, temp) {
+    const seq = prompt.slice();
+    for (let i = 0; i < n; i++) {
+      const { logits, offset } = evalLogitsLast(seq, null);
+      let mx = -1e30;
+      for (let v = 0; v < V; v++) if (logits[offset + v] > mx) mx = logits[offset + v];
+      let sum = 0;
+      const pr = new Float64Array(V);
+      for (let v = 0; v < V; v++) { pr[v] = Math.exp((logits[offset + v] - mx) / Math.max(temp, 0.05)); sum += pr[v]; }
+      let r = Math.random() * sum, next = V - 1;
+      for (let v = 0; v < V; v++) { r -= pr[v]; if (r <= 0) { next = v; break; } }
+      seq.push(next);
+    }
+    return seq;
+  }
+  function attentionProbe(seq) {
+    const capture = [];
+    evalLogitsLast(seq, capture);
+    return capture;
+  }
+  return { cfg: { ...cfg, B }, step, adam, generate, attentionProbe, nParams };
+}
+
+// ================= corpora =================
+const CORPORA = {
+  tang: {
+    name: '唐诗',
+    text: [
+      '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
+      '春眠不觉晓，处处闻啼鸟。夜来风雨声，花落知多少。',
+      '白日依山尽，黄河入海流。欲穷千里目，更上一层楼。',
+      '红豆生南国，春来发几枝。愿君多采撷，此物最相思。',
+      '空山不见人，但闻人语响。返景入深林，复照青苔上。',
+      '独坐幽篁里，弹琴复长啸。深林人不知，明月来相照。',
+      '山中相送罢，日暮掩柴扉。春草明年绿，王孙归不归。',
+      '君自故乡来，应知故乡事。来日绮窗前，寒梅著花未。',
+      '锄禾日当午，汗滴禾下土。谁知盘中餐，粒粒皆辛苦。',
+      '春种一粒粟，秋收万颗子。四海无闲田，农夫犹饿死。',
+      '千山鸟飞绝，万径人踪灭。孤舟蓑笠翁，独钓寒江雪。',
+      '松下问童子，言师采药去。只在此山中，云深不知处。',
+      '向晚意不适，驱车登古原。夕阳无限好，只是近黄昏。',
+      '危楼高百尺，手可摘星辰。不敢高声语，恐惊天上人。',
+      '众鸟高飞尽，孤云独去闲。相看两不厌，只有敬亭山。',
+      '功盖三分国，名成八阵图。江流石不转，遗恨失吞吴。',
+      '移舟泊烟渚，日暮客愁新。野旷天低树，江清月近人。',
+      '泠泠七弦上，静听松风寒。古调虽自爱，今人多不弹。',
+      '苍苍竹林寺，杳杳钟声晚。荷笠带斜阳，青山独归远。',
+      '白日何短短，百年苦易满。苍穹浩茫茫，万劫太极长。',
+    ].join('\n'),
+    prompts: ['床前', '春眠', '千山', '空山', '白日', '独坐', '锄禾'],
+  },
+  alice: {
+    name: 'Alice',
+    text: 'alice was beginning to get very tired of sitting by her sister on the bank, and of having nothing to do: once or twice she had peeped into the book her sister was reading, but it had no pictures or conversations in it, and what is the use of a book, thought alice, without pictures or conversations? so she was considering in her own mind, as well as she could, for the hot day made her feel very sleepy and stupid, whether the pleasure of making a daisy-chain would be worth the trouble of getting up and picking the daisies, when suddenly a white rabbit with pink eyes ran close by her. there was nothing so very remarkable in that; nor did alice think it so very much out of the way to hear the rabbit say to itself, oh dear! oh dear! i shall be late! but when the rabbit actually took a watch out of its waistcoat-pocket, and looked at it, and then hurried on, alice started to her feet, for it flashed across her mind that she had never before seen a rabbit with either a waistcoat-pocket, or a watch to take out of it.',
+    prompts: ['alice ', 'the r', 'so sh'],
+  },
+};
+
+// ================= app =================
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+let model, chars, stoi, data, corpusKey = 'tang';
+let running = false, stepN = 0, tokensSeen = 0, trainMs = 0;
+let losses = [], emas = [], ema = null;
+let attData = null, attSel = 0, probeTokens = null;
+let rngS = 12345;
+const rndU = () => { rngS = (rngS * 16807) % 2147483647; return (rngS - 1) / 2147483646; };
+
+function initModel() {
+  const c = CORPORA[corpusKey];
+  chars = [...new Set(c.text)].sort();
+  stoi = new Map(chars.map((ch, i) => [ch, i]));
+  data = new Int32Array(c.text.length);
+  for (let i = 0; i < c.text.length; i++) data[i] = stoi.get(c.text[i]);
+  model = createGPT({ V: chars.length, D: 48, H: 4, L: 2, T: 24, B: 8, seed: 1337 });
+  stepN = 0; tokensSeen = 0; trainMs = 0;
+  losses = []; emas = []; ema = null; attData = null;
+  probeTokens = Array.from(data.slice(0, 24));
+  $('nparams').textContent = model.nParams.toLocaleString();
+  $('lossD').textContent = `随机基线 ${Math.log(chars.length).toFixed(2)}`;
+  $('stepV').textContent = '0'; $('epochV').textContent = 'epoch 0';
+  $('lossV').textContent = '—'; $('tokensV').textContent = '0 tokens';
+  $('timeV').innerHTML = '0<small>s</small>';
+  $('genList').innerHTML = '';
+  refreshAttention();
+  drawLoss();
+}
+
+const encode = s => [...s].map(ch => stoi.get(ch)).filter(v => v !== undefined);
+const decode = a => a.map(i => chars[i]).join('');
+
+function sampleBatch() {
+  const { B, T } = model.cfg;
+  const x = new Int32Array(B * T), y = new Int32Array(B * T);
+  for (let b = 0; b < B; b++) {
+    const off = Math.floor(rndU() * (data.length - T - 1));
+    for (let t = 0; t < T; t++) {
+      x[b * T + t] = data[off + t];
+      y[b * T + t] = data[off + t + 1];
+    }
+  }
+  return [x, y];
+}
+
+// ---- loss chart ----
+const lossCv = $('lossChart'), lossCtx = lossCv.getContext('2d');
+const tip = $('tip');
+let hoverIdx = -1;
+
+function chartColors() {
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = document.documentElement.dataset.theme;
+  const isDark = theme === 'dark' || (theme !== 'light' && dark);
+  return {
+    raw: isDark ? '#184f95' : '#86b6ef',
+    emaC: isDark ? '#3987e5' : '#2a78d6',
+    grid: css('--grid'), axis: css('--axis'), muted: css('--muted'), ink: css('--ink-2'),
+  };
+}
+function setupCanvas(cv) {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const w = cv.clientWidth, h = parseInt(cv.getAttribute('height'));
+  cv.width = w * dpr; cv.height = h * dpr;
+  cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  return [w, h];
+}
+function drawLoss() {
+  const [w, h] = setupCanvas(lossCv);
+  const c = chartColors();
+  $('legRaw').style.background = c.raw;
+  $('legEma').style.background = c.emaC;
+  lossCtx.clearRect(0, 0, w, h);
+  const padL = 34, padR = 10, padT = 10, padB = 22;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  const base = Math.log(chars.length);
+  const yMax = Math.max(base * 1.08, ...losses.slice(0, 20));
+  const yMin = 0;
+  const n = losses.length;
+  const X = i => padL + (n <= 1 ? 0 : i / (n - 1) * pw);
+  const Y = v => padT + (1 - (v - yMin) / (yMax - yMin)) * ph;
+  // grid + ticks
+  lossCtx.font = '10px system-ui'; lossCtx.fillStyle = c.muted;
+  lossCtx.strokeStyle = c.grid; lossCtx.lineWidth = 1;
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) {
+    const v = yMin + (yMax - yMin) * i / ticks;
+    const y = Y(v);
+    lossCtx.beginPath(); lossCtx.moveTo(padL, y); lossCtx.lineTo(w - padR, y); lossCtx.stroke();
+    lossCtx.textAlign = 'right'; lossCtx.fillText(v.toFixed(1), padL - 6, y + 3);
+  }
+  // baseline dashed
+  lossCtx.strokeStyle = c.axis; lossCtx.setLineDash([4, 4]);
+  lossCtx.beginPath(); lossCtx.moveTo(padL, Y(base)); lossCtx.lineTo(w - padR, Y(base)); lossCtx.stroke();
+  lossCtx.setLineDash([]);
+  lossCtx.textAlign = 'left'; lossCtx.fillText('随机基线', padL + 4, Y(base) - 5);
+  // x labels
+  if (n > 1) {
+    lossCtx.textAlign = 'center';
+    lossCtx.fillText('0', padL, h - 6);
+    lossCtx.fillText(String(n - 1), w - padR, h - 6);
+    lossCtx.fillText('step', padL + pw / 2, h - 6);
+  }
+  if (n < 2) return;
+  const stride = Math.max(1, Math.floor(n / 700));
+  // raw
+  lossCtx.strokeStyle = c.raw; lossCtx.lineWidth = 1.2;
+  lossCtx.beginPath();
+  for (let i = 0; i < n; i += stride) {
+    const x = X(i), y = Y(Math.min(losses[i], yMax));
+    i === 0 ? lossCtx.moveTo(x, y) : lossCtx.lineTo(x, y);
+  }
+  lossCtx.stroke();
+  // ema
+  lossCtx.strokeStyle = c.emaC; lossCtx.lineWidth = 2;
+  lossCtx.beginPath();
+  for (let i = 0; i < n; i += stride) {
+    const x = X(i), y = Y(Math.min(emas[i], yMax));
+    i === 0 ? lossCtx.moveTo(x, y) : lossCtx.lineTo(x, y);
+  }
+  lossCtx.stroke();
+  // crosshair
+  if (hoverIdx >= 0 && hoverIdx < n) {
+    const x = X(hoverIdx);
+    lossCtx.strokeStyle = c.axis;
+    lossCtx.beginPath(); lossCtx.moveTo(x, padT); lossCtx.lineTo(x, h - padB); lossCtx.stroke();
+    lossCtx.fillStyle = c.emaC;
+    lossCtx.beginPath(); lossCtx.arc(x, Y(Math.min(emas[hoverIdx], yMax)), 3.5, 0, 7); lossCtx.fill();
+  }
+}
+lossCv.addEventListener('mousemove', e => {
+  const r = lossCv.getBoundingClientRect();
+  const n = losses.length;
+  if (n < 2) return;
+  const padL = 34, padR = 10;
+  const frac = (e.clientX - r.left - padL) / (r.width - padL - padR);
+  hoverIdx = Math.round(clampNum(frac, 0, 1) * (n - 1));
+  const c = chartColors();
+  tip.innerHTML = `<div style="color:var(--muted);font-size:10px;letter-spacing:.08em">STEP ${hoverIdx}</div>
+    <div class="row"><i style="background:${c.raw}"></i>loss ${losses[hoverIdx].toFixed(3)}</div>
+    <div class="row"><i style="background:${c.emaC}"></i>EMA ${emas[hoverIdx].toFixed(3)}</div>`;
+  tip.style.opacity = 1;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 150) + 'px';
+  tip.style.top = (e.clientY - 20) + 'px';
+  if (!running) drawLoss();
+});
+lossCv.addEventListener('mouseleave', () => { hoverIdx = -1; tip.style.opacity = 0; if (!running) drawLoss(); });
+const clampNum = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// ---- attention heatmap ----
+const attCv = $('attChart'), attCtx = attCv.getContext('2d');
+function buildChips() {
+  const box = $('headChips');
+  box.innerHTML = '';
+  for (let i = 0; i < 8; i++) {
+    const b = document.createElement('button');
+    b.textContent = `L${Math.floor(i / 4) + 1}·H${i % 4 + 1}`;
+    b.className = i === attSel ? 'on' : '';
+    b.addEventListener('click', () => {
+      attSel = i;
+      [...box.children].forEach((c, j) => c.className = j === attSel ? 'on' : '');
+      drawAtt();
+    });
+    box.appendChild(b);
+  }
+}
+function heatColor(v, isDark) {
+  // sequential single-hue ramp: surface-adjacent low → strong blue high
+  const lo = isDark ? [32, 36, 43] : [240, 244, 250];
+  const hi = isDark ? [158, 197, 244] : [13, 54, 107];
+  const t = Math.pow(clampNum(v, 0, 1), 0.55);
+  return `rgb(${Math.round(lerpN(lo[0], hi[0], t))},${Math.round(lerpN(lo[1], hi[1], t))},${Math.round(lerpN(lo[2], hi[2], t))})`;
+}
+const lerpN = (a, b, t) => a + (b - a) * t;
+let attGeom = null;
+function drawAtt() {
+  const [w, h] = setupCanvas(attCv);
+  attCtx.clearRect(0, 0, w, h);
+  if (!attData) return;
+  const theme = document.documentElement.dataset.theme;
+  const isDark = theme === 'dark' || (theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const Tc = probeTokens.length;
+  const m = attData[Math.floor(attSel / 4)][attSel % 4];
+  const padL = 22, padT = 20;
+  const cell = Math.min((w - padL - 4) / Tc, (h - padT - 4) / Tc);
+  attGeom = { padL, padT, cell, Tc };
+  const c = chartColors();
+  attCtx.font = `${Math.min(11, cell * 0.8)}px system-ui`;
+  attCtx.textAlign = 'center'; attCtx.textBaseline = 'middle';
+  for (let t = 0; t < Tc; t++) {
+    attCtx.fillStyle = c.muted;
+    attCtx.fillText(chars[probeTokens[t]], padL + t * cell + cell / 2, padT / 2 + 2);
+    attCtx.fillText(chars[probeTokens[t]], padL / 2, padT + t * cell + cell / 2);
+    for (let t2 = 0; t2 < Tc; t2++) {
+      if (t2 > t) continue;
+      attCtx.fillStyle = heatColor(m[t * Tc + t2], isDark);
+      attCtx.fillRect(padL + t2 * cell + 0.5, padT + t * cell + 0.5, cell - 1, cell - 1);
+    }
+  }
+}
+attCv.addEventListener('mousemove', e => {
+  if (!attGeom || !attData) return;
+  const r = attCv.getBoundingClientRect();
+  const { padL, padT, cell, Tc } = attGeom;
+  const t2 = Math.floor((e.clientX - r.left - padL) / cell);
+  const t = Math.floor((e.clientY - r.top - padT) / cell);
+  if (t < 0 || t2 < 0 || t >= Tc || t2 > t) { tip.style.opacity = 0; return; }
+  const m = attData[Math.floor(attSel / 4)][attSel % 4];
+  tip.innerHTML = `<div class="row">query「${chars[probeTokens[t]]}」(第${t + 1}位) 看 key「${chars[probeTokens[t2]]}」(第${t2 + 1}位)</div>
+    <div class="row" style="margin-top:3px"><i style="background:${heatColor(m[t * Tc + t2], true)}"></i>注意力权重 ${(m[t * Tc + t2] * 100).toFixed(1)}%</div>`;
+  tip.style.opacity = 1;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 240) + 'px';
+  tip.style.top = (e.clientY - 20) + 'px';
+});
+attCv.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
+
+function refreshAttention() {
+  attData = model.attentionProbe(probeTokens);
+  drawAtt();
+}
+
+// ---- generation ----
+function genSample(auto) {
+  const c = CORPORA[corpusKey];
+  const p = c.prompts[Math.floor(Math.random() * c.prompts.length)];
+  const promptIds = encode(p);
+  const temp = parseFloat($('tempRange').value);
+  const out = model.generate(promptIds, corpusKey === 'tang' ? 46 : 60, temp);
+  const gen = decode(out.slice(promptIds.length)).replace(/\n/g, ' / ');
+  const item = document.createElement('div');
+  item.className = 'item';
+  item.innerHTML = `<div class="step">STEP ${stepN} · T=${temp.toFixed(2)}${auto ? '' : ' · 手动'}</div>
+    <div class="txt"><span class="prompt"></span><span class="body"></span></div>`;
+  item.querySelector('.prompt').textContent = p;
+  item.querySelector('.body').textContent = gen;
+  const list = $('genList');
+  list.prepend(item);
+  while (list.children.length > 6) list.lastChild.remove();
+}
+
+// ---- train loop ----
+let lastFrame = 0, tpsEma = null, msEma = null;
+function frame(now) {
+  if (running) {
+    const speed = parseInt($('speedSel').value);
+    const lr = parseFloat($('lrSel').value);
+    const t0 = performance.now();
+    let l = 0;
+    for (let s = 0; s < speed; s++) {
+      const [x, y] = sampleBatch();
+      l = model.step(x, y);
+      model.adam(lr);
+      stepN++;
+      tokensSeen += model.cfg.B * model.cfg.T;
+      ema = ema === null ? l : 0.92 * ema + 0.08 * l;
+      losses.push(l); emas.push(ema);
+      if (stepN % 60 === 0) genSample(true);
+    }
+    const dtm = performance.now() - t0;
+    trainMs += dtm;
+    const ms = dtm / speed;
+    msEma = msEma === null ? ms : 0.9 * msEma + 0.1 * ms;
+    const tps = model.cfg.B * model.cfg.T / ms * 1000;
+    tpsEma = tpsEma === null ? tps : 0.9 * tpsEma + 0.1 * tps;
+    // HUD
+    $('stepV').textContent = stepN.toLocaleString();
+    $('epochV').textContent = `epoch ${(tokensSeen / data.length).toFixed(1)}`;
+    $('lossV').textContent = ema.toFixed(3);
+    $('tpsV').innerHTML = `${Math.round(tpsEma).toLocaleString()}<small>tok/s</small>`;
+    $('msV').textContent = `${msEma.toFixed(0)} ms/step`;
+    $('timeV').innerHTML = `${(trainMs / 1000).toFixed(0)}<small>s</small>`;
+    $('tokensV').textContent = `${tokensSeen.toLocaleString()} tokens`;
+    drawLoss();
+    if (stepN % 25 < speed) refreshAttention();
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---- wiring ----
+$('runBtn').addEventListener('click', () => {
+  running = !running;
+  $('runBtn').textContent = running ? '⏸ 暂停' : '▶ 继续训练';
+  $('runBtn').classList.toggle('primary', true);
+});
+$('resetBtn').addEventListener('click', () => {
+  running = false;
+  $('runBtn').textContent = '▶ 开始训练';
+  initModel();
+});
+$('corpusSel').addEventListener('change', e => {
+  corpusKey = e.target.value;
+  running = false;
+  $('runBtn').textContent = '▶ 开始训练';
+  initModel();
+});
+$('genBtn').addEventListener('click', () => genSample(false));
+$('tempRange').addEventListener('input', e => $('tempVal').textContent = parseFloat(e.target.value).toFixed(2));
+window.addEventListener('resize', () => { drawLoss(); drawAtt(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { drawLoss(); drawAtt(); });
+new MutationObserver(() => { drawLoss(); drawAtt(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+buildChips();
+initModel();
+requestAnimationFrame(frame);
+</script>
