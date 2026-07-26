@@ -1,0 +1,319 @@
+<title>电子木鱼 · 摸鱼积功德</title>
+<style>
+  :root {
+    --night: #14100c;
+    --night-2: #1d1712;
+    --amber: #e8b04b;
+    --amber-soft: rgba(232, 176, 75, 0.55);
+    --ink: #f1e4cd;
+    --dim: rgba(241, 228, 205, 0.5);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(ellipse 70% 55% at 50% 45%, #2a2118 0%, transparent 70%),
+      radial-gradient(ellipse 120% 90% at 50% 110%, #241c14 0%, transparent 60%),
+      var(--night);
+    color: var(--ink);
+    font-family: "Songti SC", "Noto Serif SC", Georgia, "PingFang SC", serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+    cursor: default; position: relative;
+  }
+
+  .incense {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 40% 30% at 50% 42%, rgba(232,176,75,0.07), transparent 70%);
+    animation: breathe 7s ease-in-out infinite;
+  }
+  @keyframes breathe { 50% { opacity: 0.45; } }
+
+  .merit { text-align: center; z-index: 2; }
+  .merit .k {
+    font-size: 11px; letter-spacing: 0.5em; color: var(--dim);
+    text-indent: 0.5em; font-family: system-ui, sans-serif;
+  }
+  .merit .v {
+    font-size: clamp(56px, 13vw, 96px); font-weight: 700; line-height: 1.05;
+    color: var(--amber); margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 34px rgba(232, 176, 75, 0.42);
+    transition: transform 90ms cubic-bezier(.34,1.7,.64,1);
+  }
+  .merit .v.hit { transform: scale(1.09); }
+
+  .fish-wrap {
+    margin-top: 28px; position: relative; z-index: 2;
+    cursor: pointer; transition: transform 90ms cubic-bezier(.34,1.7,.64,1);
+    filter: drop-shadow(0 18px 30px rgba(0,0,0,0.55));
+  }
+  .fish-wrap:active, .fish-wrap.hit { transform: scale(0.93) translateY(4px); }
+  /* scoped to the body only — a bare `.fish-wrap svg` also matches .stick and,
+     being more specific, overrides the mallet's own width. */
+  .fish-wrap .fish-svg { display: block; width: clamp(200px, 46vw, 280px); height: auto; }
+
+  .stick {
+    position: absolute; right: 2%; top: -30%;
+    width: 15%; transform-origin: 50% 92%;
+    transform: rotate(-14deg);
+    transition: transform 90ms ease;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,0.5));
+  }
+  .fish-wrap.hit .stick { transform: rotate(10deg) translateY(8%); }
+
+  .ripple {
+    position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%);
+    width: 40%; padding-bottom: 40%; border-radius: 50%;
+    border: 2px solid var(--amber-soft); opacity: 0; pointer-events: none;
+  }
+  .ripple.go { animation: ring 620ms ease-out; }
+  @keyframes ring {
+    from { opacity: 0.85; transform: translate(-50%,-50%) scale(0.5); }
+    to   { opacity: 0;    transform: translate(-50%,-50%) scale(2.3); }
+  }
+
+  .float {
+    position: fixed; pointer-events: none; z-index: 5;
+    font-size: 20px; font-weight: 600; color: var(--amber);
+    text-shadow: 0 0 18px rgba(232,176,75,0.5); white-space: nowrap;
+    animation: rise 1500ms cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  .float.zen { font-size: 16px; color: #cfe6d8; text-shadow: 0 0 16px rgba(207,230,216,0.35); }
+  @keyframes rise {
+    from { opacity: 0; transform: translate(-50%, 0) scale(0.8); }
+    18%  { opacity: 1; transform: translate(-50%, -14px) scale(1); }
+    to   { opacity: 0; transform: translate(-50%, -56px) scale(1); }
+  }
+
+  .hint {
+    margin-top: 26px; font-size: 12px; letter-spacing: 0.28em; color: var(--dim);
+    font-family: system-ui, sans-serif; text-indent: 0.28em; z-index: 2;
+  }
+  .streak {
+    margin-top: 10px; font-size: 11px; letter-spacing: 0.2em; color: var(--dim);
+    font-family: system-ui, sans-serif; height: 16px; z-index: 2;
+    font-variant-numeric: tabular-nums;
+  }
+  .streak b { color: var(--amber); font-weight: 600; }
+
+  .badge-bar {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 3;
+  }
+  .badge-bar i {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(241,228,205,0.16); transition: all 400ms ease;
+  }
+  .badge-bar i.on { background: var(--amber); box-shadow: 0 0 10px var(--amber-soft); }
+
+  .toast {
+    position: fixed; left: 50%; top: 5%; transform: translate(-50%, -14px);
+    background: rgba(29, 23, 18, 0.94); border: 1px solid rgba(232,176,75,0.35);
+    border-radius: 10px; padding: 14px 26px; text-align: center; z-index: 8;
+    opacity: 0; pointer-events: none; transition: all 420ms cubic-bezier(.2,.9,.3,1);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.55);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast .t { font-size: 10px; letter-spacing: 0.34em; color: var(--amber); font-family: system-ui, sans-serif; }
+  .toast .n { font-size: 19px; margin-top: 6px; }
+
+  .reset {
+    position: fixed; top: 16px; right: 16px; z-index: 4;
+    background: none; border: 1px solid rgba(241,228,205,0.18); border-radius: 999px;
+    color: var(--dim); font-family: system-ui, sans-serif; font-size: 11px;
+    letter-spacing: 0.16em; padding: 6px 14px; cursor: pointer;
+  }
+  .reset:hover { color: var(--ink); border-color: rgba(241,228,205,0.4); }
+</style>
+
+<div class="incense"></div>
+
+<button class="reset" id="resetBtn">重新修行</button>
+
+<div class="merit">
+  <div class="k">功德</div>
+  <div class="v" id="meritV">0</div>
+</div>
+
+<div class="fish-wrap" id="fish">
+  <div class="ripple" id="ripple"></div>
+  <svg class="fish-svg" viewBox="0 0 200 170" aria-label="木鱼">
+    <defs>
+      <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#8a5a30"/>
+        <stop offset="0.55" stop-color="#6d431f"/>
+        <stop offset="1" stop-color="#4a2c13"/>
+      </linearGradient>
+      <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="rgba(255,214,150,0.45)"/>
+        <stop offset="0.6" stop-color="rgba(255,214,150,0)"/>
+      </linearGradient>
+    </defs>
+    <ellipse cx="100" cy="150" rx="62" ry="10" fill="rgba(0,0,0,0.45)"/>
+    <path d="M100 22c46 0 78 30 78 66 0 34-33 56-78 56s-78-22-78-56c0-36 32-66 78-66z" fill="url(#body)"/>
+    <path d="M100 30c34 0 60 20 68 44-14-16-38-26-68-26s-54 10-68 26c8-24 34-44 68-44z" fill="url(#sheen)"/>
+    <path d="M42 92c14 12 34 18 58 18s44-6 58-18c-4 22-28 36-58 36s-54-14-58-36z" fill="rgba(0,0,0,0.26)"/>
+    <path d="M100 60c-20 0-36 10-42 24 10-8 25-12 42-12s32 4 42 12c-6-14-22-24-42-24z" fill="rgba(0,0,0,0.32)"/>
+    <circle cx="72" cy="76" r="5.5" fill="#2a1808"/>
+    <circle cx="70.5" cy="74.5" r="1.8" fill="rgba(255,220,160,0.75)"/>
+  </svg>
+  <svg class="stick" viewBox="0 0 40 120" aria-hidden="true">
+    <rect x="16" y="18" width="8" height="94" rx="4" fill="#6b4626"/>
+    <rect x="17.5" y="18" width="2.5" height="94" fill="rgba(255,216,160,0.28)"/>
+    <ellipse cx="20" cy="16" rx="15" ry="14" fill="#7d5430"/>
+    <ellipse cx="15" cy="11" rx="5" ry="4.5" fill="rgba(255,216,160,0.32)"/>
+  </svg>
+</div>
+
+<div class="hint">点击木鱼 · 或按空格</div>
+<div class="streak" id="streakV"></div>
+
+<div class="badge-bar" id="badges"></div>
+
+<div class="toast" id="toast">
+  <div class="t">解锁成就</div>
+  <div class="n" id="toastN"></div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const fish = $('fish'), meritV = $('meritV'), ripple = $('ripple'), toast = $('toast');
+
+  const KEY = 'muyu-merit';
+  let merit = parseInt(localStorage.getItem(KEY) || '0', 10) || 0;
+  let unlocked = new Set(JSON.parse(localStorage.getItem(KEY + '-badges') || '[]'));
+  let combo = 0, comboTimer = null;
+
+  const ZEN = [
+    '班味 −1', '烦恼 −1', 'KPI 皆空', '周五将至', '心无挂碍',
+    '已读不回', '摸鱼自在', '需求已删', 'bug 自愈', '会议取消',
+    '老板闭麦', '红尘暂歇', '早八不来', '万事随缘', '工位生莲',
+  ];
+  const BADGES = [
+    { at: 10,   name: '初入禅门' },
+    { at: 66,   name: '六六大顺，杂念渐消' },
+    { at: 108,  name: '一百零八，烦恼尽消' },
+    { at: 520,  name: '爱敲不敲，是为大爱' },
+    { at: 1000, name: '在线成佛' },
+  ];
+
+  // ---- badges bar ----
+  const bar = $('badges');
+  BADGES.forEach(b => {
+    const i = document.createElement('i');
+    i.title = `${b.at} 次 · ${b.name}`;
+    bar.appendChild(i);
+  });
+  function paintBadges() {
+    [...bar.children].forEach((el, idx) => {
+      el.classList.toggle('on', unlocked.has(BADGES[idx].at));
+    });
+  }
+
+  // ---- audio: a short woodblock "笃" ----
+  let actx = null;
+  function knock() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+
+      // noise burst -> bandpass = the wooden "click"
+      const len = 0.16;
+      const buf = actx.createBuffer(1, Math.ceil(actx.sampleRate * len), actx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) {
+        const env = Math.pow(1 - i / d.length, 5);
+        d[i] = (Math.random() * 2 - 1) * env;
+      }
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const bp = actx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 950; bp.Q.value = 3.2;
+      const ng = actx.createGain(); ng.gain.value = 0.5;
+      src.connect(bp).connect(ng).connect(actx.destination);
+      src.start(t);
+
+      // hollow body resonance
+      const detune = 1 + (Math.random() - 0.5) * 0.05;
+      for (const [f, amp, dur] of [[188, 0.34, 0.34], [372, 0.13, 0.2], [710, 0.05, 0.12]]) {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'triangle'; o.frequency.value = f * detune;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(amp, t + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+        o.connect(g).connect(actx.destination);
+        o.start(t); o.stop(t + dur + 0.02);
+      }
+    } catch (e) {}
+  }
+
+  function floatText(text, zen) {
+    const el = document.createElement('div');
+    el.className = 'float' + (zen ? ' zen' : '');
+    el.textContent = text;
+    const r = fish.getBoundingClientRect();
+    el.style.left = (r.left + r.width * (0.22 + Math.random() * 0.52)) + 'px';
+    el.style.top = (r.top - 4 + Math.random() * 14) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1550);
+  }
+
+  let toastTimer = null;
+  function showBadge(name) {
+    $('toastN').textContent = name;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+
+  function save() {
+    localStorage.setItem(KEY, String(merit));
+    localStorage.setItem(KEY + '-badges', JSON.stringify([...unlocked]));
+  }
+
+  function tap() {
+    merit++;
+    knock();
+
+    meritV.textContent = merit.toLocaleString();
+    meritV.classList.remove('hit'); void meritV.offsetWidth; meritV.classList.add('hit');
+    fish.classList.remove('hit'); void fish.offsetWidth; fish.classList.add('hit');
+    ripple.classList.remove('go'); void ripple.offsetWidth; ripple.classList.add('go');
+
+    floatText('功德 +1', false);
+    if (merit % 5 === 0) {
+      setTimeout(() => floatText(ZEN[Math.floor(Math.random() * ZEN.length)], true), 120);
+    }
+
+    combo++;
+    clearTimeout(comboTimer);
+    $('streakV').innerHTML = combo >= 3 ? `连击 <b>${combo}</b> · 心诚则灵` : '';
+    comboTimer = setTimeout(() => { combo = 0; $('streakV').innerHTML = ''; }, 1200);
+
+    for (const b of BADGES) {
+      if (merit >= b.at && !unlocked.has(b.at)) {
+        unlocked.add(b.at);
+        paintBadges();
+        setTimeout(() => showBadge(b.name), 260);
+      }
+    }
+    save();
+  }
+
+  fish.addEventListener('pointerdown', e => { e.preventDefault(); tap(); });
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.key === ' ') { e.preventDefault(); if (!e.repeat) tap(); }
+  });
+  $('resetBtn').addEventListener('click', () => {
+    merit = 0; unlocked.clear(); combo = 0;
+    meritV.textContent = '0'; $('streakV').innerHTML = '';
+    paintBadges(); save();
+  });
+
+  meritV.textContent = merit.toLocaleString();
+  paintBadges();
+})();
+</script>

@@ -1,0 +1,781 @@
+<title>The Clocktower Fell Silent · 发条村庄</title>
+<style>
+  :root {
+    --amber: #e8b04b;
+    --paper: #f3e6cf;
+    --ink: #241509;
+    --blue: #6fd8ff;
+    --serif: Georgia, "Songti SC", "Noto Serif SC", serif;
+    --sans: "Avenir Next", "Segoe UI", "PingFang SC", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #1a0f06; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  body { font-family: var(--sans); color: var(--paper); user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+
+  .grade {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 90% 80% at 50% 42%, transparent 55%, rgba(46, 20, 4, 0.42) 100%);
+  }
+
+  /* ---- intro ---- */
+  .intro { position: fixed; inset: 0; pointer-events: none; transition: opacity 900ms ease; }
+  .intro.gone { opacity: 0; }
+  .intro .card {
+    position: absolute; left: 5%; bottom: 12%;
+    max-width: 520px; padding-right: 24px;
+  }
+  .eyebrow { font-size: 11px; letter-spacing: 0.42em; color: var(--amber); margin-bottom: 14px; }
+  .eyebrow::before { content: "◆ "; font-size: 8px; vertical-align: 2px; }
+  .intro h1 {
+    font-family: var(--serif); font-weight: 500;
+    font-size: clamp(34px, 5.5vw, 54px); line-height: 1.12;
+    color: var(--paper); text-shadow: 0 2px 18px rgba(20, 8, 0, 0.6);
+    text-wrap: balance;
+  }
+  .intro .body {
+    margin-top: 14px; font-family: var(--serif); font-size: 15px; line-height: 1.6;
+    color: rgba(243, 230, 207, 0.82); max-width: 26em;
+  }
+  .intro .cta {
+    display: inline-block; margin-top: 22px; pointer-events: auto; cursor: pointer;
+    background: var(--amber); color: var(--ink);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.22em;
+    padding: 12px 22px; border: 0;
+  }
+  .intro .prog { margin-top: 16px; font-size: 11px; letter-spacing: 0.3em; color: rgba(243,230,207,0.55); }
+  .skip {
+    position: absolute; right: 24px; bottom: 24px;
+    font-size: 10px; letter-spacing: 0.3em; color: rgba(243,230,207,0.6);
+  }
+  .skip b { border: 1px solid rgba(243,230,207,0.4); padding: 3px 8px; margin-left: 8px; color: var(--paper); font-weight: 600; }
+
+  /* ---- HUD ---- */
+  .hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 600ms ease; }
+  .hud.on { opacity: 1; }
+  .quest {
+    position: absolute; top: 20px; left: 20px;
+    background: rgba(26, 13, 3, 0.62); border-left: 3px solid var(--amber);
+    padding: 12px 18px; backdrop-filter: blur(4px); max-width: 320px;
+  }
+  .quest .name { font-size: 10px; letter-spacing: 0.34em; color: var(--amber); }
+  .quest .goal { font-family: var(--serif); font-size: 15px; margin-top: 6px; color: var(--paper); }
+  .quest .cnt { font-size: 12px; letter-spacing: 0.2em; margin-top: 8px; color: rgba(243,230,207,0.7); font-variant-numeric: tabular-nums; }
+  .quest .cnt b { color: var(--blue); font-size: 15px; }
+  .dot {
+    position: absolute; left: 50%; top: 50%; width: 4px; height: 4px;
+    border-radius: 50%; background: rgba(243,230,207,0.85); transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  }
+  .subtitle {
+    position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%);
+    font-family: var(--serif); font-size: clamp(15px, 2.4vw, 20px); font-style: italic;
+    color: var(--paper); text-shadow: 0 2px 12px rgba(20,8,0,0.8);
+    text-align: center; max-width: 34em; padding: 0 20px;
+    opacity: 0; transition: opacity 500ms ease; text-wrap: balance;
+  }
+  .subtitle.show { opacity: 1; }
+  .ctl-hint {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 0.22em; color: rgba(243,230,207,0.55);
+    background: rgba(26,13,3,0.5); padding: 7px 16px;
+  }
+  .ctl-hint b { color: var(--paper); background: rgba(255,255,255,0.12); padding: 1px 6px; margin: 0 2px; }
+
+  /* ---- finale ---- */
+  .fin {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; text-align: center;
+    background: rgba(20, 9, 1, 0.55); backdrop-filter: blur(3px);
+    opacity: 0; pointer-events: none; transition: opacity 1200ms ease; padding: 24px;
+  }
+  .fin.show { opacity: 1; pointer-events: auto; }
+  .fin .eyebrow { margin-bottom: 0; }
+  .fin h2 { font-family: var(--serif); font-weight: 500; font-size: clamp(30px, 5vw, 48px); text-wrap: balance; }
+  .fin p { font-family: var(--serif); font-size: 15px; color: rgba(243,230,207,0.8); max-width: 28em; line-height: 1.7; }
+  .fin .again { margin-top: 10px; font-size: 11px; letter-spacing: 0.3em; color: var(--amber); animation: blink 1.8s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  .touch-hint { display: none; }
+  @media (pointer: coarse) {
+    .ctl-hint { display: none; }
+    .touch-hint { display: block; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; letter-spacing: 0.2em; color: rgba(243,230,207,0.55);
+      background: rgba(26,13,3,0.5); padding: 7px 16px; }
+  }
+</style>
+
+<canvas id="gl"></canvas>
+<div class="grade"></div>
+
+<div class="intro" id="intro">
+  <div class="card">
+    <div class="eyebrow">North Road</div>
+    <h1>The clocktower<br>fell silent</h1>
+    <p class="body">One vanished second glimmers beneath the hands that no longer move. Six of them scattered down the road when the mainspring sighed its last.</p>
+    <button class="cta" id="startBtn">FOLLOW THE BLUE CHIME TO THE CLOCKTOWER</button>
+    <div class="prog" id="introProg">00 / 06</div>
+  </div>
+  <div class="skip">SKIP INTRO<b>ENTER</b></div>
+</div>
+
+<div class="hud" id="hud">
+  <div class="quest">
+    <div class="name">North Road</div>
+    <div class="goal">Recover the vanished seconds</div>
+    <div class="cnt"><b id="cnt">0</b> / 6 · seconds returned</div>
+  </div>
+  <div class="dot"></div>
+  <div class="subtitle" id="subtitle"></div>
+  <div class="ctl-hint"><b>点击</b>锁定视角 · <b>W A S D</b> 移动 · <b>Shift</b> 疾走 · 走近蓝色风铃拾取</div>
+  <div class="touch-hint">左半屏拖动 = 移动 · 右半屏拖动 = 视角</div>
+</div>
+
+<div class="fin" id="fin">
+  <div class="eyebrow">North Road</div>
+  <h2>Time flows again</h2>
+  <p id="finBody">Six seconds climbed back into the works. Somewhere above the rooftops, the great wheel remembered how to turn — and the bell spoke for the first time in years.</p>
+  <div class="again">按 R 重新入夜 · 或继续在村里漫步（ESC 关闭）</div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias: true });
+if (!gl) { document.body.innerHTML = '<p style="padding:40px;font-family:sans-serif;color:#f3e6cf">此设备不支持 WebGL。</p>'; return; }
+
+let W = 0, H = 0;
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ================= math =================
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = t => t * t * (3 - 2 * t);
+let seedState = 7;
+const rnd = () => { seedState = (seedState * 16807) % 2147483647; return (seedState - 1) / 2147483646; };
+
+function m4ident() { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; }
+function m4mul(a, b) {
+  const c = new Float32Array(16);
+  for (let col = 0; col < 4; col++) for (let row = 0; row < 4; row++) {
+    let s = 0;
+    for (let k = 0; k < 4; k++) s += a[k * 4 + row] * b[col * 4 + k];
+    c[col * 4 + row] = s;
+  }
+  return c;
+}
+function m4persp(fovY, aspect, near, far) {
+  const f = 1 / Math.tan(fovY / 2), m = new Float32Array(16);
+  m[0] = f / aspect; m[5] = f;
+  m[10] = (far + near) / (near - far); m[11] = -1;
+  m[14] = 2 * far * near / (near - far);
+  return m;
+}
+function m4trans(x, y, z) { const m = m4ident(); m[12] = x; m[13] = y; m[14] = z; return m; }
+function m4rotX(a) { const m = m4ident(), c = Math.cos(a), s = Math.sin(a); m[5] = c; m[6] = s; m[9] = -s; m[10] = c; return m; }
+function m4rotY(a) { const m = m4ident(), c = Math.cos(a), s = Math.sin(a); m[0] = c; m[2] = -s; m[8] = s; m[10] = c; return m; }
+function m4rotZ(a) { const m = m4ident(), c = Math.cos(a), s = Math.sin(a); m[0] = c; m[1] = s; m[4] = -s; m[5] = c; return m; }
+function m4scale(x, y, z) { const m = m4ident(); m[0] = x; m[5] = y; m[10] = z; return m; }
+
+// ================= shaders =================
+function shader(vsSrc, fsSrc) {
+  const p = gl.createProgram();
+  gl.bindAttribLocation(p, 0, 'aPos');
+  gl.bindAttribLocation(p, 1, 'aNrm');
+  gl.bindAttribLocation(p, 2, 'aCol');
+  for (const [type, src] of [[gl.VERTEX_SHADER, vsSrc], [gl.FRAGMENT_SHADER, fsSrc]]) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  return p;
+}
+
+const meshProg = shader(`
+  attribute vec3 aPos, aNrm, aCol;
+  uniform mat4 uProj, uView, uModel;
+  varying vec3 vCol, vNrm;
+  varying float vDist;
+  void main() {
+    vec4 world = uModel * vec4(aPos, 1.0);
+    vec4 viewPos = uView * world;
+    gl_Position = uProj * viewPos;
+    vCol = aCol;
+    vNrm = mat3(uModel) * aNrm;
+    vDist = length(viewPos.xyz);
+  }`, `
+  precision mediump float;
+  varying vec3 vCol, vNrm;
+  varying float vDist;
+  uniform vec3 uLight, uFogCol;
+  uniform float uEmissive, uAlpha, uFogDen;
+  void main() {
+    vec3 n = normalize(vNrm);
+    float diff = max(dot(n, uLight), 0.0);
+    float lit = 0.52 + 0.55 * diff;
+    lit = mix(lit, 1.25, uEmissive);
+    vec3 c = vCol * lit;
+    float fog = 1.0 - exp(-vDist * vDist * uFogDen * uFogDen);
+    c = mix(c, uFogCol, fog);
+    gl_FragColor = vec4(c, uAlpha);
+  }`);
+
+const pointProg = shader(`
+  attribute vec3 aPos, aCol;
+  uniform mat4 uProj, uView;
+  varying vec3 vCol;
+  varying float vDist;
+  void main() {
+    vec4 vp = uView * vec4(aPos, 1.0);
+    gl_Position = uProj * vp;
+    vDist = length(vp.xyz);
+    gl_PointSize = clamp(160.0 / vDist, 1.0, 7.0);
+    vCol = aCol;
+  }`, `
+  precision mediump float;
+  varying vec3 vCol;
+  varying float vDist;
+  uniform vec3 uFogCol;
+  uniform float uFogDen;
+  void main() {
+    float fog = 1.0 - exp(-vDist * vDist * uFogDen * uFogDen);
+    gl_FragColor = vec4(mix(vCol, uFogCol, fog), 1.0 - fog * 0.6);
+  }`);
+
+const U = p => new Proxy({}, { get: (_, n) => gl.getUniformLocation(p, n) });
+const mu = U(meshProg), pu = U(pointProg);
+
+// ================= mesh builder =================
+function Builder() {
+  const v = [];
+  const jit = c => c.map(x => clamp(x * (0.92 + rnd() * 0.16), 0, 1));
+  function tri(a, b, c, col) {
+    const ux = b[0]-a[0], uy = b[1]-a[1], uz = b[2]-a[2];
+    const wx = c[0]-a[0], wy = c[1]-a[1], wz = c[2]-a[2];
+    let nx = uy*wz - uz*wy, ny = uz*wx - ux*wz, nz = ux*wy - uy*wx;
+    const m = Math.hypot(nx, ny, nz) || 1; nx /= m; ny /= m; nz /= m;
+    for (const p of [a, b, c]) v.push(p[0], p[1], p[2], nx, ny, nz, col[0], col[1], col[2]);
+  }
+  function quad(a, b, c, d, col) { tri(a, b, c, col); tri(a, c, d, col); }
+  function box(cx, cy, cz, sx, sy, sz, col, yaw = 0) {
+    const hx = sx/2, hy = sy/2, hz = sz/2;
+    const cs = Math.cos(yaw), sn = Math.sin(yaw);
+    const P = (x, y, z) => [cx + x*cs + z*sn, cy + y, cz - x*sn + z*cs];
+    const p = [P(-hx,-hy,-hz),P(hx,-hy,-hz),P(hx,hy,-hz),P(-hx,hy,-hz),P(-hx,-hy,hz),P(hx,-hy,hz),P(hx,hy,hz),P(-hx,hy,hz)];
+    quad(p[1],p[0],p[3],p[2],col); // -z
+    quad(p[4],p[5],p[6],p[7],col); // +z
+    quad(p[0],p[4],p[7],p[3],col); // -x
+    quad(p[5],p[1],p[2],p[6],col); // +x
+    quad(p[3],p[7],p[6],p[2],col); // top
+    quad(p[0],p[1],p[5],p[4],col); // bottom
+  }
+  function roof(cx, yb, cz, sx, sz, h, col, yaw = 0) {
+    const hx = sx/2, hz = sz/2, o = 0.35;
+    const cs = Math.cos(yaw), sn = Math.sin(yaw);
+    const P = (x, y, z) => [cx + x*cs + z*sn, yb + y, cz - x*sn + z*cs];
+    const a = P(-hx-o,0,-hz-o), b = P(hx+o,0,-hz-o), c = P(hx+o,0,hz+o), d = P(-hx-o,0,hz+o);
+    const r1 = P(0,h,-hz-o), r2 = P(0,h,hz+o);
+    tri(a, r1, b, col);          // front gable
+    tri(d, c, r2, col);          // back gable
+    quad(b, c, r2, r1, col);     // east slope
+    quad(d, a, r1, r2, col);     // west slope
+  }
+  const IT = (1 + Math.sqrt(5)) / 2;
+  const IV = [[-1,IT,0],[1,IT,0],[-1,-IT,0],[1,-IT,0],[0,-1,IT],[0,1,IT],[0,-1,-IT],[0,1,-IT],[IT,0,-1],[IT,0,1],[-IT,0,-1],[-IT,0,1]]
+    .map(p => { const m = Math.hypot(...p); return [p[0]/m, p[1]/m, p[2]/m]; });
+  const IF = [[0,11,5],[0,5,1],[0,1,7],[0,7,10],[0,10,11],[1,5,9],[5,11,4],[11,10,2],[10,7,6],[7,1,8],[3,9,4],[3,4,2],[3,2,6],[3,6,8],[3,8,9],[4,9,5],[2,4,11],[6,2,10],[8,6,7],[9,8,1]];
+  function blob(cx, cy, cz, sx, sy, sz, col) {
+    const pts = IV.map(p => [cx + p[0]*sx*(0.9+rnd()*0.2), cy + p[1]*sy*(0.9+rnd()*0.2), cz + p[2]*sz*(0.9+rnd()*0.2)]);
+    for (const f of IF) tri(pts[f[0]], pts[f[1]], pts[f[2]], jit(col));
+  }
+  function cylinder(cx, cy, cz, r, h, segs, col) {
+    for (let i = 0; i < segs; i++) {
+      const a0 = i / segs * TAU, a1 = (i + 1) / segs * TAU;
+      const x0 = Math.cos(a0)*r, z0 = Math.sin(a0)*r, x1 = Math.cos(a1)*r, z1 = Math.sin(a1)*r;
+      quad([cx+x0,cy,cz+z0],[cx+x1,cy,cz+z1],[cx+x1,cy+h,cz+z1],[cx+x0,cy+h,cz+z0], col);
+      tri([cx,cy+h,cz],[cx+x0,cy+h,cz+z0],[cx+x1,cy+h,cz+z1], col);
+    }
+  }
+  function disc(cx, cy, cz, r, segs, col) { // facing -z
+    for (let i = 0; i < segs; i++) {
+      const a0 = i/segs*TAU, a1 = (i+1)/segs*TAU;
+      tri([cx,cy,cz],[cx+Math.cos(a0)*r,cy+Math.sin(a0)*r,cz],[cx+Math.cos(a1)*r,cy+Math.sin(a1)*r,cz],col);
+    }
+  }
+  function octa(cx, cy, cz, r, col) {
+    const T = [cx,cy+r,cz], B = [cx,cy-r,cz];
+    const E = [[cx+r*0.7,cy,cz],[cx,cy,cz+r*0.7],[cx-r*0.7,cy,cz],[cx,cy,cz-r*0.7]];
+    for (let i = 0; i < 4; i++) {
+      tri(T, E[i], E[(i+1)%4], col);
+      tri(B, E[(i+1)%4], E[i], col);
+    }
+  }
+  function upload() {
+    const data = new Float32Array(v);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+    return { buf, n: v.length / 9 };
+  }
+  return { tri, quad, box, roof, blob, cylinder, disc, octa, upload, get count() { return v.length / 9; } };
+}
+
+function drawMesh(mesh, model, emissive = 0, alpha = 1) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
+  const S = 36;
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, S, 0);
+  gl.vertexAttribPointer(1, 3, gl.FLOAT, false, S, 12);
+  gl.vertexAttribPointer(2, 3, gl.FLOAT, false, S, 24);
+  gl.uniformMatrix4fv(mu.uModel, false, model);
+  gl.uniform1f(mu.uEmissive, emissive);
+  gl.uniform1f(mu.uAlpha, alpha);
+  gl.drawArrays(gl.TRIANGLES, 0, mesh.n);
+}
+
+// ================= palette =================
+const C = {
+  grass: [[0.55,0.52,0.23],[0.61,0.55,0.24],[0.5,0.47,0.2],[0.66,0.53,0.22]],
+  road: [0.42,0.33,0.22],
+  wall: [[0.91,0.80,0.60],[0.85,0.66,0.44],[0.78,0.58,0.42],[0.88,0.74,0.55]],
+  roofc: [[0.78,0.33,0.18],[0.68,0.28,0.16],[0.82,0.42,0.2],[0.6,0.3,0.22]],
+  leafc: [[0.85,0.45,0.16],[0.78,0.33,0.14],[0.88,0.58,0.2],[0.72,0.26,0.12],[0.87,0.5,0.25]],
+  trunk: [0.4,0.27,0.16],
+  tower: [0.62,0.45,0.3],
+  towerTrim: [0.45,0.3,0.19],
+  face: [0.95,0.9,0.78],
+  hand: [0.2,0.12,0.05],
+  chime: [0.43,0.85,1.0],
+  window: [1.0,0.83,0.45],
+  door: [0.35,0.22,0.12],
+};
+const pick = arr => arr[Math.floor(rnd() * arr.length)];
+
+// ================= build world =================
+const colliders = [];
+const B = Builder();
+
+// ground patchwork
+{
+  const CELL = 6, N = 24;
+  for (let i = -N; i < N; i++) for (let j = -6; j < N + 18; j++) {
+    const x0 = i*CELL, z0 = j*CELL;
+    const col = pick(C.grass);
+    B.quad([x0,0,z0],[x0+CELL,0,z0],[x0+CELL,0,z0+CELL],[x0,0,z0+CELL], col);
+  }
+  // road
+  for (let z = -30; z < 126; z += 6) {
+    const wob = Math.sin(z * 0.05) * 1.2;
+    B.quad([-3.2+wob,0.02,z],[3.2+wob,0.02,z],[3.2+wob,0.02,z+6],[-3.2+wob,0.02,z+6], C.road);
+  }
+  // plaza before tower
+  B.quad([-9,0.02,120],[9,0.02,120],[9,0.02,138],[-9,0.02,138], C.road);
+}
+
+// houses along the road
+function house(x, z, facing) {
+  const w = 5 + rnd()*2.5, d = 4.5 + rnd()*2, h = 3 + rnd()*1.2;
+  const wall = pick(C.wall), rf = pick(C.roofc);
+  const yaw = facing > 0 ? Math.PI/2 : -Math.PI/2;
+  B.box(x, h/2, z, w, h, d, wall, yaw);
+  B.roof(x, h, z, w, d, 1.6 + rnd()*0.8, rf, yaw);
+  // door & windows on road-facing side
+  const fx = x - facing * (d/2 + 0.02);
+  B.quad([fx, 0, z-0.6*facing], [fx, 0, z+0.6*facing], [fx, 1.9, z+0.6*facing], [fx, 1.9, z-0.6*facing], C.door);
+  for (const off of [-w*0.28, w*0.28]) {
+    const wz = z + off;
+    B.quad([fx, 1.2, wz-0.45*facing], [fx, 1.2, wz+0.45*facing], [fx, 2.1, wz+0.45*facing], [fx, 2.1, wz-0.45*facing], C.window);
+  }
+  // chimney
+  B.box(x + (rnd()-0.5)*w*0.4, h + 1.2, z + (rnd()-0.5)*0.8, 0.7, 1.6, 0.7, C.towerTrim, yaw);
+  colliders.push({ x, z, r: Math.max(w, d) / 2 + 0.6 });
+}
+for (let z = 4; z < 112; z += 13 + rnd()*8) {
+  if (rnd() < 0.85) house(-(8.5 + rnd()*4), z, -1);
+  if (rnd() < 0.85) house(8.5 + rnd()*4, z + 6, 1);
+}
+
+// trees
+function tree(x, z) {
+  const th = 1.6 + rnd()*1.4;
+  B.cylinder(x, 0, z, 0.28 + rnd()*0.15, th, 5, C.trunk);
+  const leaf = pick(C.leafc);
+  const r = 1.5 + rnd()*1.1;
+  B.blob(x, th + r*0.7, z, r, r*0.95, r, leaf);
+  if (rnd() < 0.5) B.blob(x + (rnd()-0.5)*r, th + r*1.3, z + (rnd()-0.5)*r, r*0.6, r*0.55, r*0.6, pick(C.leafc));
+  colliders.push({ x, z, r: 0.7 });
+}
+for (let i = 0; i < 90; i++) {
+  const x = (rnd()-0.5) * 130;
+  const z = -25 + rnd() * 165;
+  if (Math.abs(x) < 6.5) continue;
+  if (Math.abs(x) < 16 && z > 0 && z < 115) { if (rnd() < 0.7) continue; }
+  if (Math.hypot(x, z - 130) < 16) continue;
+  tree(x, z);
+}
+// distant hills
+for (const [hx, hz, hr] of [[-70,60,26],[75,40,30],[-60,150,34],[80,140,28],[0,190,40],[-90,-10,24],[90,-20,26]]) {
+  B.blob(hx, -hr*0.35, hz, hr, hr*0.5, hr, [0.52,0.44,0.2]);
+}
+
+// ---- clocktower ----
+const TOWER = { x: 0, z: 130 };
+{
+  const { x, z } = TOWER;
+  B.box(x, 9, z, 7, 18, 7, C.tower);
+  B.box(x, 18.8, z, 8.2, 1.6, 8.2, C.towerTrim);
+  B.box(x, 21.5, z, 6.4, 4.4, 6.4, pick(C.wall));
+  B.roof(x, 23.7, z, 6.4, 6.4, 4.2, [0.55,0.24,0.14]);
+  // belfry openings
+  for (const s of [-1, 1]) {
+    B.quad([x+s*3.22, 20.2, z-1], [x+s*3.22, 20.2, z+1], [x+s*3.22, 23.2, z+1], [x+s*3.22, 23.2, z-1], [0.12,0.07,0.03]);
+  }
+  B.quad([x-1, 20.2, z-3.22], [x+1, 20.2, z-3.22], [x+1, 23.2, z-3.22], [x-1, 23.2, z-3.22], [0.12,0.07,0.03]);
+  // clock face (south side, facing player)
+  B.disc(x, 13.5, z - 3.53, 2.6, 20, C.face);
+  B.disc(x, 13.5, z - 3.55, 2.9, 20, C.towerTrim);
+  // tick marks
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * TAU;
+    const tx = x + Math.cos(a) * 2.2, ty = 13.5 + Math.sin(a) * 2.2;
+    B.box(tx, ty, z - 3.6, 0.16, 0.34, 0.06, C.hand);
+  }
+  // door
+  B.quad([x-1.1, 0, z-3.54], [x+1.1, 0, z-3.54], [x+1.1, 3.2, z-3.54], [x-1.1, 3.2, z-3.54], C.door);
+  colliders.push({ x, z, r: 5.4 });
+}
+
+const world = B.upload();
+
+// ---- dynamic meshes ----
+const chimeB = Builder(); chimeB.octa(0, 0, 0, 0.55, C.chime);
+const chimeMesh = chimeB.upload();
+const beaconB = Builder();
+{ // translucent light column
+  const r = 1.1, h = 30, segs = 8;
+  for (let i = 0; i < segs; i++) {
+    const a0 = i/segs*TAU, a1 = (i+1)/segs*TAU;
+    beaconB.quad(
+      [Math.cos(a0)*r, 0, Math.sin(a0)*r], [Math.cos(a1)*r, 0, Math.sin(a1)*r],
+      [Math.cos(a1)*r, h, Math.sin(a1)*r], [Math.cos(a0)*r, h, Math.sin(a0)*r], C.chime);
+  }
+}
+const beaconMesh = beaconB.upload();
+const handB1 = Builder(); handB1.box(0, 0.95, 0, 0.22, 1.9, 0.1, C.hand);
+const hourHand = handB1.upload();
+const handB2 = Builder(); handB2.box(0, 1.15, 0, 0.16, 2.3, 0.1, C.hand);
+const minHand = handB2.upload();
+
+// leaves (points)
+const LEAF_N = 260;
+const leafPos = new Float32Array(LEAF_N * 3);
+const leafCol = new Float32Array(LEAF_N * 3);
+const leafVel = [];
+for (let i = 0; i < LEAF_N; i++) {
+  leafPos[i*3] = (rnd()-0.5) * 90;
+  leafPos[i*3+1] = rnd() * 14;
+  leafPos[i*3+2] = -20 + rnd() * 170;
+  const c = pick(C.leafc);
+  leafCol[i*3] = c[0]; leafCol[i*3+1] = c[1]; leafCol[i*3+2] = c[2];
+  leafVel.push({ vx: 0.4 + rnd()*0.8, vy: -(0.5 + rnd()*0.7), ph: rnd()*TAU });
+}
+const leafPosBuf = gl.createBuffer();
+const leafColBuf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, leafColBuf);
+gl.bufferData(gl.ARRAY_BUFFER, leafCol, gl.STATIC_DRAW);
+
+// ================= game state =================
+const chimes = [
+  { x: 2.5, z: 10,  line: 'A second, still warm — it fell from the baker’s noon and never landed.' },
+  { x: -7,  z: 33,  line: 'Under the red maple, a minute curled up like a sleeping cat.' },
+  { x: 8,   z: 55,  line: 'This one rang once inside a kettle. The kettle kept the echo.' },
+  { x: -8.5,z: 78,  line: 'It hid in a chimney’s shadow, pretending to be a spark.' },
+  { x: 6,   z: 100, line: 'Nearly home now. The hands upstairs are starting to itch.' },
+  { x: 0,   z: 122, line: 'The last one. The tower inhales. Wind the works.' },
+];
+const player = { x: 0, y: 1.7, z: -14, yaw: Math.PI, pitch: 0 };
+const state = { mode: 'intro', t: 0, got: 0, subT: 0, finT: 0, bell: 0, handSpin: 0 };
+const keys = new Set();
+
+// ================= audio =================
+let actx = null;
+const AC = () => {
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+};
+function chimeSound(n) {
+  try {
+    const a = AC(), t = a.currentTime;
+    const base = 620 + n * 55;
+    for (const [ratio, amp, dur] of [[1, 0.22, 1.6], [2.76, 0.09, 1.0], [5.4, 0.04, 0.5]]) {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = base * ratio;
+      g.gain.setValueAtTime(amp, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur);
+    }
+  } catch (e) {}
+}
+function toll(delay) {
+  try {
+    const a = AC(), t = a.currentTime + delay;
+    for (const [ratio, amp, dur] of [[1, 0.3, 3.2], [2.0, 0.12, 2.2], [2.92, 0.07, 1.4], [4.2, 0.03, 0.8]]) {
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = 'sine'; o.frequency.value = 132 * ratio;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(amp, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur);
+    }
+  } catch (e) {}
+}
+
+// ================= input =================
+const ui = {
+  intro: document.getElementById('intro'), hud: document.getElementById('hud'),
+  cnt: document.getElementById('cnt'), subtitle: document.getElementById('subtitle'),
+  fin: document.getElementById('fin'), startBtn: document.getElementById('startBtn'),
+};
+function startGame() {
+  if (state.mode !== 'intro') return;
+  state.mode = 'play';
+  ui.intro.classList.add('gone');
+  ui.hud.classList.add('on');
+  AC();
+}
+ui.startBtn.addEventListener('click', () => { startGame(); canvas.requestPointerLock && canvas.requestPointerLock(); });
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'enter') startGame();
+  if (k === 'r' && state.got >= 6) location.reload();
+  if (k === 'escape') ui.fin.classList.remove('show');
+  keys.add(k);
+});
+document.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+canvas.addEventListener('click', () => {
+  if (state.mode === 'intro') startGame();
+  if (!isTouch && document.pointerLockElement !== canvas) canvas.requestPointerLock && canvas.requestPointerLock();
+});
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement === canvas) {
+    player.yaw -= e.movementX * 0.0023;
+    player.pitch = clamp(player.pitch - e.movementY * 0.0023, -1.35, 1.35);
+  }
+});
+
+// touch controls
+let isTouch = false;
+const touches = {};
+canvas.addEventListener('touchstart', e => {
+  isTouch = true;
+  startGame();
+  for (const t of e.changedTouches) {
+    touches[t.identifier] = { x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, side: t.clientX < W/2 ? 'L' : 'R' };
+  }
+  e.preventDefault();
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  for (const t of e.changedTouches) {
+    const o = touches[t.identifier];
+    if (!o) continue;
+    if (o.side === 'R') {
+      player.yaw -= (t.clientX - o.x) * 0.005;
+      player.pitch = clamp(player.pitch - (t.clientY - o.y) * 0.005, -1.35, 1.35);
+    }
+    o.x = t.clientX; o.y = t.clientY;
+  }
+  e.preventDefault();
+}, { passive: false });
+const endTouch = e => { for (const t of e.changedTouches) delete touches[t.identifier]; };
+canvas.addEventListener('touchend', endTouch);
+canvas.addEventListener('touchcancel', endTouch);
+
+// ================= update =================
+let subTimer = null;
+function showLine(text) {
+  ui.subtitle.textContent = text;
+  ui.subtitle.classList.add('show');
+  clearTimeout(subTimer);
+  subTimer = setTimeout(() => ui.subtitle.classList.remove('show'), 4500);
+}
+
+function update(dt) {
+  state.t += dt;
+  if (state.mode === 'play') {
+    // movement
+    let mx = 0, mz = 0;
+    if (keys.has('w') || keys.has('arrowup')) mz += 1;
+    if (keys.has('s') || keys.has('arrowdown')) mz -= 1;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+    if (keys.has('d') || keys.has('arrowright')) mx += 1;
+    for (const id in touches) {
+      const o = touches[id];
+      if (o.side === 'L') {
+        mx += clamp((o.x - o.x0) / 60, -1, 1);
+        mz += clamp((o.y0 - o.y) / 60, -1, 1);
+      }
+    }
+    const mag = Math.hypot(mx, mz);
+    if (mag > 0.01) {
+      mx /= Math.max(mag, 1); mz /= Math.max(mag, 1);
+      const sp = (keys.has('shift') ? 9 : 5.5) * dt;
+      const fy = player.yaw;
+      const fx = -Math.sin(fy), fz = -Math.cos(fy);
+      const rx = Math.cos(fy), rz = -Math.sin(fy);
+      player.x += (fx * mz + rx * mx) * sp;
+      player.z += (fz * mz + rz * mx) * sp;
+      state.bob = (state.bob || 0) + dt * (keys.has('shift') ? 11 : 8);
+    }
+    // colliders
+    for (const c of colliders) {
+      const dx = player.x - c.x, dz = player.z - c.z;
+      const d = Math.hypot(dx, dz);
+      const min = c.r + 0.5;
+      if (d < min && d > 0.001) {
+        player.x = c.x + dx / d * min;
+        player.z = c.z + dz / d * min;
+      }
+    }
+    player.x = clamp(player.x, -60, 60);
+    player.z = clamp(player.z, -26, 150);
+    player.y = 1.7 + Math.sin(state.bob || 0) * 0.05;
+
+    // chime pickup
+    if (state.got < chimes.length) {
+      const c = chimes[state.got];
+      if (Math.hypot(player.x - c.x, player.z - c.z) < 2.4) {
+        chimeSound(state.got);
+        showLine(c.line);
+        state.got++;
+        ui.cnt.textContent = state.got;
+        if (state.got >= chimes.length) {
+          for (let i = 0; i < 6; i++) toll(1 + i * 1.4);
+          setTimeout(() => ui.fin.classList.add('show'), 2600);
+          state.clockLive = true;
+        }
+      }
+    }
+  }
+  if (state.clockLive) state.handSpin += dt;
+
+  // leaves
+  for (let i = 0; i < LEAF_N; i++) {
+    const v = leafVel[i];
+    leafPos[i*3]   += (v.vx + Math.sin(state.t * 1.3 + v.ph) * 0.5) * dt;
+    leafPos[i*3+1] += v.vy * dt;
+    leafPos[i*3+2] += Math.cos(state.t * 0.9 + v.ph) * 0.4 * dt;
+    if (leafPos[i*3+1] < 0.05) {
+      leafPos[i*3+1] = 10 + rnd() * 6;
+      leafPos[i*3]   = player.x + (rnd()-0.5) * 70;
+      leafPos[i*3+2] = player.z + (rnd()-0.5) * 70;
+    }
+  }
+}
+
+// ================= render =================
+const FOG = [0.93, 0.80, 0.60];
+const proj = () => m4persp(1.08, W / H, 0.1, 500);
+
+function cameraMatrix() {
+  let ex, ey, ez, yaw, pitch;
+  if (state.mode === 'intro') {
+    const t = clamp(state.t / 14, 0, 1);
+    const a = state.t * 0.06 + 2.4;
+    ex = lerp(Math.cos(a) * 55, player.x, smooth(t));
+    ez = lerp(60 + Math.sin(a) * 45, player.z, smooth(t));
+    ey = lerp(30, player.y, smooth(t));
+    const tx = TOWER.x - ex, ty = 16 - ey, tz = TOWER.z - ez;
+    yaw = Math.atan2(-tx, -tz);
+    pitch = Math.asin(ty / Math.hypot(tx, ty, tz));
+  } else {
+    ex = player.x; ey = player.y; ez = player.z;
+    yaw = player.yaw; pitch = player.pitch;
+  }
+  return m4mul(m4rotX(-pitch), m4mul(m4rotY(-yaw), m4trans(-ex, -ey, -ez)));
+}
+
+function render() {
+  gl.clearColor(FOG[0], FOG[1], FOG[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.disable(gl.CULL_FACE);
+
+  const P = proj(), V = cameraMatrix();
+
+  gl.useProgram(meshProg);
+  gl.enableVertexAttribArray(0); gl.enableVertexAttribArray(1); gl.enableVertexAttribArray(2);
+  gl.uniformMatrix4fv(mu.uProj, false, P);
+  gl.uniformMatrix4fv(mu.uView, false, V);
+  const L = [0.5, 0.72, -0.42], lm = Math.hypot(...L);
+  gl.uniform3f(mu.uLight, L[0]/lm, L[1]/lm, L[2]/lm);
+  gl.uniform3f(mu.uFogCol, ...FOG);
+  gl.uniform1f(mu.uFogDen, 0.0075);
+
+  drawMesh(world, m4ident());
+
+  // clock hands
+  const faceZ = TOWER.z - 3.78;
+  const hSpin = state.clockLive ? state.handSpin : 0;
+  const hourA = -(10 / 12) * TAU - hSpin * 0.35;
+  const minA  = -(8 / 60) * TAU - hSpin * 2.2;
+  drawMesh(hourHand, m4mul(m4trans(TOWER.x, 13.5, faceZ), m4rotZ(hourA)));
+  drawMesh(minHand,  m4mul(m4trans(TOWER.x, 13.5, faceZ), m4rotZ(minA)));
+
+  // current chime + beacon
+  if (state.got < chimes.length && state.mode !== 'finished') {
+    const c = chimes[state.got];
+    const bobY = 1.3 + Math.sin(state.t * 2.2) * 0.25;
+    const pulse = 0.85 + Math.sin(state.t * 3) * 0.15;
+    drawMesh(chimeMesh,
+      m4mul(m4trans(c.x, bobY, c.z), m4mul(m4rotY(state.t * 1.5), m4scale(pulse, pulse, pulse))), 1.0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+    gl.depthMask(false);
+    drawMesh(beaconMesh, m4trans(c.x, 0, c.z), 1.0, 0.09 + Math.sin(state.t * 2) * 0.03);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+  }
+
+  // leaves
+  gl.useProgram(pointProg);
+  gl.uniformMatrix4fv(pu.uProj, false, P);
+  gl.uniformMatrix4fv(pu.uView, false, V);
+  gl.uniform3f(pu.uFogCol, ...FOG);
+  gl.uniform1f(pu.uFogDen, 0.0075);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.bindBuffer(gl.ARRAY_BUFFER, leafPosBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, leafPos, gl.DYNAMIC_DRAW);
+  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, leafColBuf);
+  gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 0, 0);
+  gl.disableVertexAttribArray(1);
+  gl.drawArrays(gl.POINTS, 0, LEAF_N);
+  gl.enableVertexAttribArray(1);
+  gl.disable(gl.BLEND);
+}
+
+// ================= loop =================
+let last = performance.now();
+function frame(now) {
+  const dt = clamp((now - last) / 1000, 0, 0.05);
+  last = now;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>

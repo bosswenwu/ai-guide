@@ -1,0 +1,664 @@
+<title>SALTWIND · 帆船竞速</title>
+<style>
+  :root {
+    --navy: rgba(13, 42, 54, 0.82);
+    --navy-line: rgba(255, 255, 255, 0.12);
+    --coral: #f2653c;
+    --teal: #38c9b8;
+    --ink: #eef6f8;
+    --dim: rgba(238, 246, 248, 0.55);
+    --sans: "Avenir Next", "Segoe UI", "PingFang SC", "Helvetica Neue", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: #0d2a36;
+    font-family: var(--sans);
+    color: var(--ink);
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .hud { position: fixed; inset: 0; pointer-events: none; }
+  .panel {
+    position: absolute;
+    background: var(--navy);
+    border: 1px solid var(--navy-line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    backdrop-filter: blur(6px);
+  }
+  .label { font-size: 10px; letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
+  .big { font-variant-numeric: tabular-nums; }
+
+  .brand { top: 16px; left: 16px; display: flex; align-items: baseline; gap: 10px; }
+  .brand .logo { font-weight: 700; letter-spacing: 0.18em; font-size: 14px; }
+  .brand .logo::before { content: "✛ "; color: var(--coral); }
+  .brand .sub { font-size: 10px; letter-spacing: 0.22em; color: var(--dim); border-left: 1px solid var(--navy-line); padding-left: 10px; }
+
+  .gate-panel { top: 62px; left: 16px; }
+  .gate-panel .big { font-size: 26px; font-weight: 700; margin-top: 2px; }
+  .gate-panel .big small { font-size: 14px; color: var(--dim); font-weight: 500; }
+  .ticks { display: flex; gap: 4px; margin-top: 8px; }
+  .ticks i { width: 16px; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.18); }
+  .ticks i.done { background: var(--teal); }
+
+  .timer { top: 16px; left: 50%; transform: translateX(-50%); text-align: center; background: none; border: 0; }
+  .timer .label { font-size: 9px; }
+  .timer .big { font-size: 34px; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+  .timer .best { font-size: 11px; color: var(--dim); letter-spacing: 0.12em; }
+
+  .windbox { top: 16px; right: 16px; display: flex; align-items: center; gap: 12px; }
+  .windbox .arrow-wrap { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--navy-line); display: flex; align-items: center; justify-content: center; }
+  .windbox .arrow { font-size: 18px; color: var(--teal); display: block; transition: transform 200ms linear; }
+  .windbox .pos { font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+  .speed { left: 16px; bottom: 16px; border-left: 3px solid var(--coral); }
+  .speed .big { font-size: 34px; font-weight: 700; }
+  .speed .big small { font-size: 13px; color: var(--dim); margin-left: 4px; }
+
+  .trim { right: 16px; bottom: 96px; width: 210px; }
+  .trim .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .trim .pct { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .trim .bar { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.14); margin: 10px 0 8px; }
+  .trim .bar .opt { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--teal); border-radius: 1px; }
+  .trim .bar .knob { position: absolute; top: -4px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); transform: translateX(-50%); box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .trim .hint { font-size: 9px; letter-spacing: 0.18em; color: var(--dim); }
+
+  .gust { right: 16px; bottom: 16px; display: flex; align-items: center; gap: 12px; width: 210px; }
+  .gust svg { width: 40px; height: 40px; }
+  .gust .state { font-size: 14px; font-weight: 700; letter-spacing: 0.1em; margin-top: 2px; }
+  .gust .state.ready { color: var(--coral); }
+
+  .keys {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 0.14em; color: var(--dim);
+    background: rgba(13,42,54,0.6); padding: 6px 14px; border-radius: 6px;
+  }
+  .keys b { color: var(--ink); font-weight: 600; background: rgba(255,255,255,0.12); border-radius: 3px; padding: 1px 5px; margin: 0 2px; }
+
+  .overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+    background: rgba(8, 26, 34, 0.55); backdrop-filter: blur(3px);
+    text-align: center; padding: 24px; transition: opacity 300ms ease;
+  }
+  .overlay.hidden { opacity: 0; pointer-events: none; }
+  .overlay .title { font-size: clamp(34px, 7vw, 56px); font-weight: 800; letter-spacing: 0.24em; text-indent: 0.24em; }
+  .overlay .title::before { content: "✛ "; color: var(--coral); }
+  .overlay .tag { font-size: 12px; letter-spacing: 0.3em; color: var(--teal); text-transform: uppercase; }
+  .overlay .rules { font-size: 14px; line-height: 2; color: rgba(238,246,248,0.85); max-width: 30em; }
+  .overlay .rules b { background: rgba(255,255,255,0.14); border-radius: 4px; padding: 1px 7px; font-weight: 600; }
+  .overlay .go { margin-top: 10px; font-size: 13px; letter-spacing: 0.24em; color: var(--coral); animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .overlay .fintime { font-size: clamp(40px, 9vw, 64px); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .overlay .newbest { color: var(--teal); letter-spacing: 0.2em; font-size: 13px; }
+
+  .touch { position: fixed; inset: 0; pointer-events: none; display: none; }
+  @media (pointer: coarse) { .touch { display: block; } .keys { display: none; } }
+  .touch button {
+    pointer-events: auto; position: absolute; width: 58px; height: 58px;
+    border-radius: 50%; border: 1px solid var(--navy-line);
+    background: var(--navy); color: var(--ink); font-size: 18px; font-weight: 700;
+  }
+  .touch .tl { left: 18px; bottom: 118px; } .touch .tr { left: 86px; bottom: 118px; }
+  .touch .ti { right: 86px; bottom: 190px; } .touch .to { right: 18px; bottom: 190px; }
+  .touch .tg { right: 52px; bottom: 258px; border-color: var(--coral); color: var(--coral); font-size: 11px; letter-spacing: 0.1em; }
+</style>
+
+<canvas id="sea"></canvas>
+
+<div class="hud">
+  <div class="panel brand"><span class="logo">SALTWIND</span><span class="sub">REGATTA 01</span></div>
+  <div class="panel gate-panel">
+    <div class="label">Gate</div>
+    <div class="big"><span id="gateNow">01</span><small> / <span id="gateAll">07</span></small></div>
+    <div class="ticks" id="ticks"></div>
+  </div>
+  <div class="panel timer">
+    <div class="label">Race Time</div>
+    <div class="big" id="clock">0:00.0</div>
+    <div class="best" id="bestLine">BEST —</div>
+  </div>
+  <div class="panel windbox">
+    <div class="arrow-wrap"><span class="arrow" id="windArrow">➤</span></div>
+    <div><div class="label">Wind Flow</div><div class="pos" id="pointOfSail">Beam reach</div></div>
+  </div>
+  <div class="panel speed">
+    <div class="big"><span id="knots">0</span><small>KN</small></div>
+    <div class="label">Boat Speed</div>
+  </div>
+  <div class="panel trim">
+    <div class="row"><span class="label">Sail Trim</span><span class="pct" id="trimPct">50%</span></div>
+    <div class="bar"><div class="opt" id="trimOpt"></div><div class="knob" id="trimKnob"></div></div>
+    <div class="hint" id="trimHint">SHEET IN · PRESS S</div>
+  </div>
+  <div class="panel gust">
+    <svg viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="4"/>
+      <circle id="gustArc" cx="20" cy="20" r="16" fill="none" stroke="#f2653c" stroke-width="4"
+              stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="100.5"
+              transform="rotate(-90 20 20)"/>
+    </svg>
+    <div><div class="label">Gust Drive</div><div class="state" id="gustState">CHARGING</div></div>
+  </div>
+  <div class="keys"><b>A</b><b>D</b> steer · <b>W</b> ease out · <b>S</b> sheet in · <b>Space</b> gust · <b>R</b> restart</div>
+</div>
+
+<div class="touch">
+  <button class="tl" data-k="a">◀</button><button class="tr" data-k="d">▶</button>
+  <button class="ti" data-k="s">帆−</button><button class="to" data-k="w">帆+</button>
+  <button class="tg" data-k=" ">GUST</button>
+</div>
+
+<div class="overlay" id="startOverlay">
+  <div class="tag">Regatta 01 · 七道标门</div>
+  <div class="title">SALTWIND</div>
+  <div class="rules">
+    顺序穿过 7 道红绿浮标门。<b>A / D</b> 转向，<b>S</b> 收帆、<b>W</b> 松帆，
+    让帆角贴住绿色刻度线才能吃满风；蓄满的 <b>空格</b> 阵风给你一段爆发加速。
+    逆风顶着风头（In irons）船会停 —— 学会抢风换舷。
+  </div>
+  <div class="go" id="goHint">按任意键 · 起航</div>
+</div>
+
+<div class="overlay hidden" id="finishOverlay">
+  <div class="tag">Finish</div>
+  <div class="fintime" id="finTime">0:00.0</div>
+  <div class="newbest" id="finBest"></div>
+  <div class="go">按 R · 再来一局</div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const TAU = Math.PI * 2;
+  const canvas = document.getElementById('sea');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, DPR = 1, HORIZON = 0, FOCAL = 0;
+  const CAM_H = 7;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    HORIZON = H * 0.36;
+    FOCAL = H * 0.95;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const wrapPi = a => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const hash = (i, j) => { let h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return h - Math.floor(h); };
+
+  // ---- course ----
+  const GATE_W = 30;
+  const legTurns = [0, 0.30, -0.52, 0.42, -0.28, 0.58, -0.48];
+  const gates = [];
+  {
+    let x = 0, z = 0, h = 0;
+    for (let i = 0; i < legTurns.length; i++) {
+      h += legTurns[i];
+      const len = 135 + (i % 3) * 25;
+      x += Math.sin(h) * len; z += Math.cos(h) * len;
+      const px = Math.cos(h), pz = -Math.sin(h); // perpendicular
+      gates.push({
+        mx: x, mz: z, dx: Math.sin(h), dz: Math.cos(h),
+        ax: x - px * GATE_W / 2, az: z - pz * GATE_W / 2,
+        bx: x + px * GATE_W / 2, bz: z + pz * GATE_W / 2,
+      });
+    }
+  }
+  const islands = [];
+  gates.forEach((g, i) => {
+    if (i % 2 === 0) return;
+    const side = i % 4 === 1 ? 1 : -1;
+    const px = g.dz * side, pz = -g.dx * side;
+    islands.push({ x: g.mx + px * 130, z: g.mz + pz * 130 + 60, r: 34 + i * 4, seed: i * 7 + 3, lh: i === 3 });
+  });
+  islands.push({ x: -160, z: 240, r: 42, seed: 11, lh: false });
+
+  // ---- state ----
+  const boat = { x: 0, z: -40, h: 0, speed: 0, trim: 0.5, roll: 0 };
+  const wind = { from: 1.9, speed: 7 };
+  const state = { started: false, finished: false, time: 0, gate: 0, prevS: -1, gustCharge: 1, gustLeft: 0 };
+  let best = Number(localStorage.getItem('saltwind-best')) || 0;
+  const wake = [];
+  const keys = new Set();
+
+  // ---- HUD refs ----
+  const $ = id => document.getElementById(id);
+  const ui = {
+    gateNow: $('gateNow'), gateAll: $('gateAll'), ticks: $('ticks'), clock: $('clock'),
+    bestLine: $('bestLine'), windArrow: $('windArrow'), pointOfSail: $('pointOfSail'),
+    knots: $('knots'), trimPct: $('trimPct'), trimKnob: $('trimKnob'), trimOpt: $('trimOpt'),
+    trimHint: $('trimHint'), gustArc: $('gustArc'), gustState: $('gustState'),
+    startOverlay: $('startOverlay'), finishOverlay: $('finishOverlay'),
+    finTime: $('finTime'), finBest: $('finBest'),
+  };
+  ui.gateAll.textContent = String(gates.length).padStart(2, '0');
+  for (let i = 0; i < gates.length; i++) ui.ticks.appendChild(document.createElement('i'));
+  const fmt = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}.${Math.floor((t % 1) * 10)}`;
+  if (best) ui.bestLine.textContent = 'BEST ' + fmt(best);
+
+  // ---- audio ----
+  let actx = null;
+  function whoosh() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime, len = 0.9;
+      const buf = actx.createBuffer(1, actx.sampleRate * len, actx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const f = actx.createBiquadFilter(); f.type = 'bandpass';
+      f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1400, t + len * 0.7);
+      const g = actx.createGain(); g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+      src.connect(f).connect(g).connect(actx.destination); src.start(t);
+    } catch (e) {}
+  }
+  function ding() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const t = actx.currentTime;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine'; o.frequency.value = 880;
+      g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.5);
+    } catch (e) {}
+  }
+
+  // ---- input ----
+  function press(k) {
+    if (!state.started && !state.finished) { state.started = true; ui.startOverlay.classList.add('hidden'); }
+    if (k === ' ' && state.gustCharge >= 1 && state.gustLeft <= 0 && !state.finished) {
+      state.gustLeft = 3; state.gustCharge = 0; whoosh();
+    }
+    if (k === 'r') restart();
+  }
+  document.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === ' ') e.preventDefault();
+    if (!e.repeat) press(k === 'arrowleft' ? 'a' : k === 'arrowright' ? 'd' : k);
+    keys.add(k);
+  });
+  document.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+  document.querySelectorAll('.touch button').forEach(b => {
+    const k = b.dataset.k;
+    const on = e => { e.preventDefault(); press(k); keys.add(k); };
+    const off = e => { e.preventDefault(); keys.delete(k); };
+    b.addEventListener('touchstart', on); b.addEventListener('touchend', off); b.addEventListener('touchcancel', off);
+    b.addEventListener('mousedown', on); b.addEventListener('mouseup', off);
+  });
+
+  function restart() {
+    boat.x = 0; boat.z = -40; boat.h = 0; boat.speed = 0; boat.trim = 0.5; boat.roll = 0;
+    state.started = false; state.finished = false; state.time = 0; state.gate = 0;
+    state.gustCharge = 1; state.gustLeft = 0; wake.length = 0;
+    ui.finishOverlay.classList.add('hidden'); ui.startOverlay.classList.remove('hidden');
+    ui.ticks.querySelectorAll('i').forEach(i => i.classList.remove('done'));
+  }
+
+  const steer = () => (keys.has('a') || keys.has('arrowleft') ? -1 : 0) + (keys.has('d') || keys.has('arrowright') ? 1 : 0);
+
+  // ---- physics ----
+  const polarPts = [[0,0],[30,0.12],[45,0.6],[60,0.85],[90,1.0],[120,1.05],[150,0.9],[180,0.72]];
+  function polar(awa) {
+    for (let i = 1; i < polarPts.length; i++) {
+      if (awa <= polarPts[i][0]) {
+        const [a0, v0] = polarPts[i-1], [a1, v1] = polarPts[i];
+        return lerp(v0, v1, (awa - a0) / (a1 - a0));
+      }
+    }
+    return 0.72;
+  }
+  const posName = a => a < 30 ? 'In irons' : a < 55 ? 'Close hauled' : a < 80 ? 'Close reach'
+    : a < 110 ? 'Beam reach' : a < 150 ? 'Broad reach' : 'Running';
+
+  let time = 0;
+  function update(dt) {
+    time += dt;
+    wind.from = 1.9 + Math.sin(time * 0.04) * 0.25;
+    wind.speed = 7 + Math.sin(time * 0.13) * 0.7 + Math.sin(time * 0.041) * 0.4;
+
+    if (state.started && !state.finished) state.time += dt;
+
+    const turn = steer();
+    boat.h += turn * dt * (0.55 + 0.75 * clamp(boat.speed / 5, 0, 1));
+    if (keys.has('w')) boat.trim = clamp(boat.trim + dt * 0.55, 0, 1);
+    if (keys.has('s')) boat.trim = clamp(boat.trim - dt * 0.55, 0, 1);
+
+    const rel = wrapPi(wind.from - boat.h);
+    const awa = Math.abs(rel) * 180 / Math.PI;
+    const side = rel >= 0 ? 1 : -1;
+    const opt = clamp((awa - 30) / 150, 0, 1);
+    const eff = Math.max(0, 1 - Math.abs(boat.trim - opt) * 2.2);
+    const gust = state.gustLeft > 0 ? 1.55 : 1;
+    let target = wind.speed * polar(awa) * (0.3 + 0.7 * eff) * gust;
+    if (!state.started) target = 0;
+    boat.speed = lerp(boat.speed, target, clamp(dt * 0.7, 0, 1));
+    boat.x += Math.sin(boat.h) * boat.speed * dt;
+    boat.z += Math.cos(boat.h) * boat.speed * dt;
+    boat.roll = lerp(boat.roll, -side * eff * polar(awa) * 0.16 * gust, clamp(dt * 2, 0, 1));
+
+    if (state.gustLeft > 0) state.gustLeft -= dt;
+    else state.gustCharge = clamp(state.gustCharge + dt / 8, 0, 1);
+
+    // wake
+    if (boat.speed > 1.2 && Math.random() < dt * 22) {
+      const bx = boat.x - Math.sin(boat.h) * 3, bz = boat.z - Math.cos(boat.h) * 3;
+      wake.push({ x: bx + (Math.random() - 0.5) * 1.6, z: bz + (Math.random() - 0.5) * 1.6, age: 0, life: 1.4 + Math.random() });
+    }
+    for (let i = wake.length - 1; i >= 0; i--) { wake[i].age += dt; if (wake[i].age > wake[i].life) wake.splice(i, 1); }
+
+    // gate crossing
+    if (!state.finished && state.gate < gates.length) {
+      const g = gates[state.gate];
+      const s = (boat.x - g.mx) * g.dx + (boat.z - g.mz) * g.dz;
+      const lat = (boat.x - g.mx) * g.dz - (boat.z - g.mz) * g.dx;
+      if (state.prevS < 0 && s >= 0 && Math.abs(lat) < GATE_W / 2 + 3) {
+        ui.ticks.children[state.gate].classList.add('done');
+        state.gate++; ding();
+        if (state.gate >= gates.length) {
+          state.finished = true;
+          ui.finTime.textContent = fmt(state.time);
+          if (!best || state.time < best) {
+            best = state.time; localStorage.setItem('saltwind-best', best);
+            ui.finBest.textContent = '★ NEW BEST';
+          } else ui.finBest.textContent = 'BEST ' + fmt(best);
+          ui.bestLine.textContent = 'BEST ' + fmt(best);
+          ui.finishOverlay.classList.remove('hidden');
+        }
+        state.prevS = -1;
+      } else state.prevS = s;
+    }
+
+    // HUD
+    ui.clock.textContent = fmt(state.time);
+    ui.gateNow.textContent = String(Math.min(state.gate + 1, gates.length)).padStart(2, '0');
+    ui.knots.textContent = Math.round(boat.speed * 1.944);
+    ui.pointOfSail.textContent = posName(awa);
+    ui.windArrow.style.transform = `rotate(${(rel * 180 / Math.PI) + 90}deg)`;
+    ui.trimPct.textContent = Math.round(boat.trim * 100) + '%';
+    ui.trimKnob.style.left = (boat.trim * 100) + '%';
+    ui.trimOpt.style.left = (opt * 100) + '%';
+    ui.trimHint.textContent = eff > 0.85 ? 'IN THE GROOVE'
+      : boat.trim > opt ? 'SHEET IN · PRESS S' : 'EASE OUT · PRESS W';
+    ui.gustArc.style.strokeDashoffset = 100.5 * (1 - state.gustCharge);
+    const ready = state.gustCharge >= 1 && state.gustLeft <= 0;
+    ui.gustState.textContent = state.gustLeft > 0 ? 'SURGING' : ready ? 'READY' : 'CHARGING';
+    ui.gustState.classList.toggle('ready', ready);
+  }
+
+  // ---- projection ----
+  let camX = 0, camZ = 0, camH = 0;
+  function project(wx, wz) {
+    const rx = wx - camX, rz = wz - camZ;
+    const c = Math.cos(camH), s = Math.sin(camH);
+    const dx = rx * c - rz * s, dz = rx * s + rz * c;
+    if (dz < 1.5) return null;
+    return { x: W / 2 + (dx / dz) * FOCAL, y: HORIZON + (CAM_H / dz) * FOCAL, s: FOCAL / dz, z: dz };
+  }
+
+  // ---- render ----
+  function render() {
+    camH = lerp(camH, camH + wrapPi(boat.h - camH), 0.12);
+    camX = boat.x - Math.sin(camH) * 16;
+    camZ = boat.z - Math.cos(camH) * 16;
+
+    // sky
+    let g = ctx.createLinearGradient(0, 0, 0, HORIZON);
+    g.addColorStop(0, '#bfe0ee'); g.addColorStop(1, '#dcedf3');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, HORIZON + 1);
+    // sea
+    g = ctx.createLinearGradient(0, HORIZON, 0, H);
+    g.addColorStop(0, '#7db9d6'); g.addColorStop(0.25, '#519ecb'); g.addColorStop(1, '#3a7fae');
+    ctx.fillStyle = g; ctx.fillRect(0, HORIZON, W, H - HORIZON);
+    // haze at horizon
+    ctx.fillStyle = 'rgba(220, 237, 243, 0.5)'; ctx.fillRect(0, HORIZON - 1, W, 3);
+
+    drawIslands();
+    drawSparkles();
+    drawWindChevrons();
+    drawWake();
+    drawGates();
+    drawBoat();
+  }
+
+  function drawIslands() {
+    for (const isl of islands) {
+      const c = project(isl.x, isl.z);
+      if (!c || c.z < isl.r + 4 || c.z > 1400) continue;
+      const K = 14;
+      // sand base
+      ctx.beginPath();
+      for (let k = 0; k <= K; k++) {
+        const a = (k / K) * TAU;
+        const r = isl.r * (0.75 + 0.3 * hash(isl.seed, k % K));
+        const p = project(isl.x + Math.cos(a) * r, isl.z + Math.sin(a) * r);
+        if (!p) { ctx.closePath(); break; }
+        k === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y);
+      }
+      ctx.fillStyle = '#d9b77e'; ctx.fill();
+      // hills
+      for (let m = 0; m < 3; m++) {
+        const a = hash(isl.seed + 1, m) * TAU;
+        const r = isl.r * 0.4 * hash(isl.seed + 2, m);
+        const hx = isl.x + Math.cos(a) * r, hz = isl.z + Math.sin(a) * r;
+        const b = project(hx, hz);
+        if (!b) continue;
+        const hw = isl.r * (0.5 + 0.3 * hash(isl.seed + 3, m)) * b.s;
+        const hh = (10 + 14 * hash(isl.seed + 4, m)) * b.s;
+        ctx.beginPath();
+        ctx.moveTo(b.x - hw, b.y); ctx.lineTo(b.x, b.y - hh); ctx.lineTo(b.x + hw, b.y);
+        ctx.closePath();
+        ctx.fillStyle = m === 1 ? '#8faf62' : '#a3b96b'; ctx.fill();
+      }
+      if (isl.lh) {
+        const b = project(isl.x, isl.z);
+        if (b) {
+          const w = 3.5 * b.s, h = 18 * b.s;
+          ctx.fillStyle = '#f2efe6'; ctx.fillRect(b.x - w / 2, b.y - h, w, h);
+          ctx.fillStyle = '#e04a3a'; ctx.fillRect(b.x - w / 2, b.y - h, w, h * 0.22);
+          ctx.fillRect(b.x - w / 2, b.y - h * 0.55, w, h * 0.18);
+        }
+      }
+    }
+  }
+
+  function drawSparkles() {
+    const SP = 13, R = 230;
+    const i0 = Math.floor((camX - R) / SP), i1 = Math.ceil((camX + R) / SP);
+    const j0 = Math.floor((camZ - R) / SP), j1 = Math.ceil((camZ + R) / SP);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const h1 = hash(i, j);
+      if (h1 > 0.35) continue;
+      const wx = i * SP + h1 * SP, wz = j * SP + hash(j, i) * SP;
+      const bob = Math.sin(time * 1.5 + h1 * 20) * 0.5 + 0.5;
+      const p = project(wx, wz);
+      if (!p || p.z > R) continue;
+      const a = (1 - p.z / R) * 0.7 * bob;
+      if (a < 0.04) continue;
+      const len = Math.max(1.5, 5 * p.s);
+      ctx.moveTo(p.x - len, p.y); ctx.lineTo(p.x + len, p.y);
+    }
+    ctx.stroke();
+  }
+
+  function drawWindChevrons() {
+    const wtx = -Math.sin(wind.from), wtz = -Math.cos(wind.from);
+    const SP = 46, R = 200, L = 60;
+    const i0 = Math.floor((camX - R) / SP), i1 = Math.ceil((camX + R) / SP);
+    const j0 = Math.floor((camZ - R) / SP), j1 = Math.ceil((camZ + R) / SP);
+    ctx.strokeStyle = 'rgba(56, 201, 184, 0.8)';
+    ctx.lineWidth = 2;
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const h1 = hash(i * 3, j * 5);
+      if (h1 > 0.22) continue;
+      const drift = ((time * wind.speed * 0.8 + h1 * L) % L) - L / 2;
+      const wx = i * SP + wtx * drift, wz = j * SP + wtz * drift;
+      const p = project(wx, wz);
+      const tip = project(wx + wtx * 3, wz + wtz * 3);
+      if (!p || !tip || p.z > R) continue;
+      const a = (1 - p.z / R);
+      if (a < 0.06) continue;
+      const vx = tip.x - p.x, vy = tip.y - p.y;
+      const m = Math.hypot(vx, vy) || 1;
+      const ux = vx / m, uy = vy / m, px = -uy, py = ux;
+      const s = Math.max(3, 9 * p.s);
+      ctx.globalAlpha = a * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(tip.x - ux * s + px * s * 0.8, tip.y - uy * s + py * s * 0.8);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.lineTo(tip.x - ux * s - px * s * 0.8, tip.y - uy * s - py * s * 0.8);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawWake() {
+    for (const w of wake) {
+      const p = project(w.x, w.z);
+      if (!p) continue;
+      const t = w.age / w.life;
+      ctx.globalAlpha = (1 - t) * 0.55;
+      ctx.fillStyle = '#eaf6fa';
+      const r = (1.2 + t * 3.5) * p.s;
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, r, r * 0.4, 0, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBuoy(wx, wz, color, seed) {
+    const p = project(wx, wz);
+    if (!p || p.z > 900) return;
+    const bob = Math.sin(time * 1.8 + seed * 9) * 1.2 * p.s;
+    const s = p.s, x = p.x, y = p.y + bob;
+    ctx.fillStyle = 'rgba(20,50,70,0.25)';
+    ctx.beginPath(); ctx.ellipse(x, y + 1 * s, 4.5 * s, 1.6 * s, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x - 3.4 * s, y); ctx.lineTo(x - 1.1 * s, y - 9 * s);
+    ctx.lineTo(x + 1.1 * s, y - 9 * s); ctx.lineTo(x + 3.4 * s, y); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(x - 2.6 * s, y - 4.2 * s, 5.2 * s, 1.4 * s);
+    ctx.strokeStyle = '#3d3327'; ctx.lineWidth = Math.max(1, 0.7 * s);
+    ctx.beginPath(); ctx.moveTo(x, y - 9 * s); ctx.lineTo(x, y - 14 * s); ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(x, y - 14 * s); ctx.lineTo(x + 4 * s, y - 12.8 * s); ctx.lineTo(x, y - 11.6 * s);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function drawGates() {
+    for (let i = gates.length - 1; i >= 0; i--) {
+      const g = gates[i];
+      const passed = i < state.gate;
+      const isNext = i === state.gate;
+      ctx.globalAlpha = passed ? 0.35 : 1;
+      drawBuoy(g.ax, g.az, '#e04a3a', i * 2);
+      drawBuoy(g.bx, g.bz, '#3fae6a', i * 2 + 1);
+      ctx.globalAlpha = 1;
+      if (isNext && !state.finished) {
+        const mid = project(g.mx, g.mz);
+        if (mid && mid.z < 900) {
+          const d = Math.hypot(boat.x - g.mx, boat.z - g.mz);
+          // clamp the projection scale: an unclamped value throws the marker
+          // hundreds of px above a far gate, into the HUD.
+          const s = clamp(mid.s, 0.35, 1.5);
+          ctx.strokeStyle = 'rgba(56, 201, 184, 0.95)';
+          ctx.lineWidth = Math.max(2, 2.5 * s);
+          for (let k = 0; k < 3; k++) {
+            const yy = mid.y - (22 + k * 9) * s - Math.sin(time * 3) * 3 * s;
+            const w2 = 7 * s;
+            ctx.globalAlpha = 1 - k * 0.28;
+            ctx.beginPath();
+            ctx.moveTo(mid.x - w2, yy - w2 * 0.8); ctx.lineTo(mid.x, yy); ctx.lineTo(mid.x + w2, yy - w2 * 0.8);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+          ctx.font = `600 ${Math.max(11, 13 * Math.min(s * 2, 1))}px ${'"Avenir Next", "Segoe UI", sans-serif'}`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.fillText(`${Math.round(d)}m`, mid.x, mid.y - 52 * s);
+          ctx.font = `500 ${Math.max(8, 9 * Math.min(s * 2, 1))}px "Avenir Next", "Segoe UI", sans-serif`;
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.fillText('NEXT GATE', mid.x, mid.y - 52 * s + 13);
+        }
+      }
+    }
+  }
+
+  function drawBoat() {
+    const rel = wrapPi(wind.from - boat.h);
+    const side = rel >= 0 ? 1 : -1;
+    const boom = side * (0.22 + boat.trim * 1.0);
+    const bx = W / 2, by = H * 0.78 + Math.sin(time * 1.6) * 3;
+    const S = Math.min(W, H) / 420;
+
+    ctx.save();
+    ctx.translate(bx, by);
+    ctx.rotate(boat.roll);
+    ctx.scale(S, S);
+
+    // foam at bow
+    ctx.fillStyle = 'rgba(240, 250, 252, 0.8)';
+    ctx.beginPath(); ctx.ellipse(0, 26, 46 + boat.speed * 2.4, 10 + boat.speed * 0.9, 0, 0, TAU); ctx.fill();
+
+    // hull
+    ctx.beginPath();
+    ctx.moveTo(-30, 6); ctx.quadraticCurveTo(-32, 26, -20, 30);
+    ctx.lineTo(20, 30); ctx.quadraticCurveTo(32, 26, 30, 6);
+    ctx.quadraticCurveTo(0, 12, -30, 6); ctx.closePath();
+    ctx.fillStyle = '#8a5a34'; ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-30, 6); ctx.quadraticCurveTo(0, 14, 30, 6);
+    ctx.quadraticCurveTo(0, 2, -30, 6); ctx.closePath();
+    ctx.fillStyle = '#c89b66'; ctx.fill();
+
+    // mast
+    ctx.strokeStyle = '#5e4225'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(0, 8); ctx.lineTo(0, -108); ctx.stroke();
+
+    // sail
+    const bex = Math.sin(boom) * 52;
+    ctx.beginPath();
+    ctx.moveTo(0, -104);
+    ctx.quadraticCurveTo(bex * 0.85, -50, bex, -4);
+    ctx.quadraticCurveTo(bex * 0.35, -30, 0, -100);
+    ctx.closePath();
+    ctx.fillStyle = '#7fa37a'; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.5; ctx.stroke();
+    // boom
+    ctx.strokeStyle = '#5e4225'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0, -4); ctx.lineTo(bex, -4); ctx.stroke();
+    // telltale flag
+    ctx.strokeStyle = '#e04a3a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -108);
+    ctx.lineTo(-Math.sin(wrapPi(wind.from - boat.h)) * 10, -108 + 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ---- main loop ----
+  let last = performance.now();
+  function frame(now) {
+    const dt = clamp((now - last) / 1000, 0, 0.05);
+    last = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
