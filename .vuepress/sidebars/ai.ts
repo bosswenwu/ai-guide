@@ -16,6 +16,7 @@ export default [
     "title": "AI项目教程",
     "collapsable": true,
     "children": [
+      "AI项目教程/零依赖交互 Demo 合集：手写 3D 引擎 + 浏览器里训练 GPT",
       "AI项目教程/AI 海龟汤项目教程",
       "AI项目教程/AI + Cursor 开发一个亲戚计算器",
       "AI项目教程/AI + Cursor 开发一个模拟面试系统",

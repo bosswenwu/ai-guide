@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>零依赖交互 Demo 合集 · AI 指南</title>
+<meta name="description" content="四个纯手写、零依赖的网页交互 Demo：电子木鱼、帆船竞速、发条村庄、以及在浏览器里从零训练一个 GPT。">
+<style>
+  :root {
+    --page: #f7f6f3;
+    --surface: #fdfdfc;
+    --ink: #14130f;
+    --ink-2: #55534c;
+    --muted: #8b8880;
+    --border: rgba(20, 19, 15, 0.11);
+    --accent: #2a78d6;
+    --shadow: 0 1px 2px rgba(20,19,15,.05), 0 8px 24px rgba(20,19,15,.07);
+    --shadow-hi: 0 2px 6px rgba(20,19,15,.08), 0 18px 44px rgba(20,19,15,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0e0e0d; --surface: #1a1a19; --ink: #f4f3ef; --ink-2: #b8b6ad;
+      --muted: #8b8880; --border: rgba(255,255,255,0.12); --accent: #62a5ee;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
+      --shadow-hi: 0 2px 6px rgba(0,0,0,.5), 0 18px 44px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0e0e0d; --surface: #1a1a19; --ink: #f4f3ef; --ink-2: #b8b6ad;
+    --muted: #8b8880; --border: rgba(255,255,255,0.12); --accent: #62a5ee;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.34);
+    --shadow-hi: 0 2px 6px rgba(0,0,0,.5), 0 18px 44px rgba(0,0,0,.5);
+  }
+  :root[data-theme="light"] {
+    --page: #f7f6f3; --surface: #fdfdfc; --ink: #14130f; --ink-2: #55534c;
+    --muted: #8b8880; --border: rgba(20,19,15,0.11); --accent: #2a78d6;
+    --shadow: 0 1px 2px rgba(20,19,15,.05), 0 8px 24px rgba(20,19,15,.07);
+    --shadow-hi: 0 2px 6px rgba(20,19,15,.08), 0 18px 44px rgba(20,19,15,.14);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.6;
+    padding: clamp(32px, 6vw, 72px) 20px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  /* ---------- header ---------- */
+  header { max-width: 40em; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.26em; color: var(--accent);
+    font-weight: 700; text-transform: uppercase;
+  }
+  h1 {
+    font-size: clamp(30px, 5.4vw, 46px); font-weight: 700; letter-spacing: -0.01em;
+    margin-top: 12px; line-height: 1.15; text-wrap: balance;
+  }
+  .lede { margin-top: 16px; font-size: clamp(15px, 1.9vw, 17px); color: var(--ink-2); text-wrap: pretty; }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .facts span {
+    font-size: 12px; color: var(--ink-2); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 13px;
+  }
+  .facts b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- grid ---------- */
+  /* 2×2 — four cards in three columns would leave an orphan on the second row */
+  .grid {
+    margin-top: clamp(32px, 5vw, 52px);
+    display: grid; gap: clamp(16px, 2.4vw, 26px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (max-width: 719px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .card {
+    display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden; text-decoration: none; color: inherit;
+    box-shadow: var(--shadow);
+    transition: transform 220ms cubic-bezier(.2,.8,.3,1), box-shadow 220ms ease, border-color 220ms ease;
+  }
+  .card:hover, .card:focus-visible {
+    transform: translateY(-4px); box-shadow: var(--shadow-hi);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { .card { transition: none; } .card:hover { transform: none; } }
+
+  .shot { position: relative; aspect-ratio: 16 / 10; background: var(--page); overflow: hidden; }
+  .shot img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform 500ms cubic-bezier(.2,.8,.3,1);
+  }
+  .card:hover .shot img { transform: scale(1.035); }
+  .shot::after {
+    content: ""; position: absolute; inset: 0;
+    box-shadow: inset 0 -1px 0 var(--border);
+    pointer-events: none;
+  }
+  /* the demos put their own UI at the top of the frame; darken behind the badge
+     so it stays legible over any of them */
+  .shot::before {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 76px; z-index: 1;
+    background: linear-gradient(rgba(8,8,7,0.44), rgba(8,8,7,0));
+    pointer-events: none;
+  }
+  .kicker {
+    position: absolute; z-index: 2; top: 12px; left: 12px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+    background: rgba(10,10,9,0.72); color: #fff;
+    border-radius: 999px; padding: 5px 11px; backdrop-filter: blur(6px);
+  }
+
+  .body { padding: 18px 20px 20px; display: flex; flex-direction: column; flex: 1; }
+  .card h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.005em; }
+  .card h2 .em { font-size: 17px; margin-right: 7px; }
+  .card .desc { margin-top: 8px; font-size: 14px; color: var(--ink-2); flex: 1; text-wrap: pretty; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+  .tags i {
+    font-style: normal; font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px;
+  }
+  .go {
+    margin-top: 15px; font-size: 13px; font-weight: 600; color: var(--accent);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .go svg { width: 13px; height: 13px; transition: transform 220ms ease; }
+  .card:hover .go svg { transform: translateX(3px); }
+
+  /* ---------- note ---------- */
+  .note {
+    margin-top: clamp(34px, 5vw, 54px);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: clamp(20px, 3vw, 28px);
+  }
+  .note h3 { font-size: 15px; font-weight: 700; }
+  .note p { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 62em; text-wrap: pretty; }
+  .note p + p { margin-top: 9px; }
+  .note code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px; background: var(--page); border: 1px solid var(--border);
+    border-radius: 5px; padding: 1px 6px;
+  }
+  footer {
+    margin-top: 34px; font-size: 12.5px; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">AI Guide · 互动实验室</div>
+    <h1>零依赖交互 Demo 合集</h1>
+    <p class="lede">
+      四个可以直接玩的网页 Demo，全部<b>纯手写、零依赖</b>——没有 Three.js，没有 PyTorch，
+      没有任何 npm 包。每个都是一个单独的 HTML 文件，右键「查看源代码」就能看到全部实现。
+    </p>
+    <div class="facts">
+      <span><b>4</b> 个 Demo</span>
+      <span><b>0</b> 个依赖</span>
+      <span>手写 WebGL 引擎</span>
+      <span>手写 Transformer 反向传播</span>
+      <span>明暗双主题</span>
+    </div>
+  </header>
+
+  <main class="grid">
+
+    <a class="card" href="./train-gpt.html">
+      <div class="shot">
+        <img src="./preview/train-gpt.jpg" alt="GPT 训练页面截图：损失曲线从 5.57 下降到 0.2，右侧是自注意力热图，下方是模型生成的唐诗样本" loading="lazy" width="1000" height="625">
+        <span class="kicker">最硬核</span>
+      </div>
+      <div class="body">
+        <h2><span class="em">🧠</span>在浏览器里从零训练一个 GPT</h2>
+        <p class="desc">
+          不是可视化演示，是真的在训练神经网络。8.3 万参数的 Transformer，
+          前向传播、反向传播、Adam 优化器全部纯 JS 手写，梯度用中心差分校验过（最大相对误差 2.3e-6）。
+          实时看 loss 从 5.57 砸到 0.2、注意力热图长出格律条纹、生成样本从乱码变成唐诗。
+        </p>
+        <div class="tags"><i>Transformer</i><i>手写 backprop</i><i>注意力可视化</i><i>Canvas</i></div>
+        <span class="go">开始训练
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="card" href="./clocktower.html">
+      <div class="shot">
+        <img src="./preview/clocktower.jpg" alt="发条村庄截图：暖橙色低多边形村庄，中央是一座钟楼，左下角是标题「The clocktower fell silent」" loading="lazy" width="1000" height="625">
+        <span class="kicker">手写 3D 引擎</span>
+      </div>
+      <div class="body">
+        <h2><span class="em">🕰️</span>The Clocktower Fell Silent</h2>
+        <p class="desc">
+          第一人称探索小游戏。因为不能外链 Three.js，整个 3D 引擎从零手写：
+          矩阵数学、着色器、平面着色光照、指数雾效、低多边形几何生成器。
+          钟楼停摆了，循着蓝色风铃找回 6 颗消失的秒，让大钟重新鸣响。
+        </p>
+        <div class="tags"><i>WebGL</i><i>手写矩阵/着色器</i><i>程序化生成</i><i>第一人称</i></div>
+        <span class="go">进入村庄
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="card" href="./saltwind.html">
+      <div class="shot">
+        <img src="./preview/saltwind.jpg" alt="帆船竞速截图：蓝色海面上的帆船，前方是红绿浮标门，四周是 HUD 仪表" loading="lazy" width="1000" height="625">
+        <span class="kicker">真实帆船物理</span>
+      </div>
+      <div class="body">
+        <h2><span class="em">⛵</span>SALTWIND 帆船竞速</h2>
+        <p class="desc">
+          Canvas 伪 3D 海面上的绕标计时赛。用真实的帆船极曲线建模：
+          顶风会停（In irons），横风最快，帆角要贴住最优刻度才吃满风。
+          7 道浮标门，蓄力阵风爆发加速，成绩本地保存。
+        </p>
+        <div class="tags"><i>Canvas 2D</i><i>伪 3D 投影</i><i>帆船极曲线</i><i>Web Audio</i></div>
+        <span class="go">起航
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </div>
+    </a>
+
+    <a class="card" href="./muyu.html">
+      <div class="shot">
+        <img src="./preview/muyu.jpg" alt="电子木鱼截图：深色禅房背景，中央是琥珀色功德数字和一个木鱼" loading="lazy" width="1000" height="625">
+        <span class="kicker">解压小品</span>
+      </div>
+      <div class="body">
+        <h2><span class="em">🪷</span>电子木鱼 · 摸鱼积功德</h2>
+        <p class="desc">
+          点一下功德 +1，配合合成出来的「笃」声和飘字禅语：
+          「班味 −1」「KPI 皆空」「周五将至」。敲到 108 下解锁「烦恼尽消」，
+          1000 下「在线成佛」。功德本地保存，明天接着敲。
+        </p>
+        <div class="tags"><i>SVG</i><i>Web Audio 合成</i><i>CSS 动画</i><i>localStorage</i></div>
+        <span class="go">开始敲
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+        </span>
+      </div>
+    </a>
+
+  </main>
+
+  <section class="note">
+    <h3>关于「零依赖」</h3>
+    <p>
+      这四个页面各自是一个自包含的 HTML 文件，不加载任何外部脚本、样式或字体。
+      3D 部分直接调 WebGL 原生 API：投影矩阵、旋转矩阵、顶点/片元着色器都是手写的；
+      GPT 那个连矩阵乘法和 LayerNorm 的反向传播都是一行行写出来的。
+    </p>
+    <p>
+      手写反向传播最大的坑是——<b>错了不会报错</b>，只会「训练效果差一点」，肉眼根本看不出来。
+      所以 GPT 那个先写了数值梯度校验：用中心差分逐个扰动参数算出真实梯度，
+      和解析梯度逐一对比，确认最大相对误差在 <code>1e-6</code> 量级（浮点噪声水平）之后才开始做界面。
+    </p>
+    <p>
+      想看实现，在任意一个 Demo 页面右键「查看网页源代码」即可，或到仓库的
+      <code>.vuepress/public/demos/</code> 目录下阅读。
+    </p>
+  </section>
+
+  <footer>
+    <span>AI 指南 · 互动实验室</span>
+    <span>·</span>
+    <a href="https://ai.codefather.cn">ai.codefather.cn</a>
+    <span>·</span>
+    <span>建议在桌面浏览器体验，3D Demo 需要 WebGL</span>
+  </footer>
+
+</div>
+</body>
+</html>
